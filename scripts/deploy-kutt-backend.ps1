@@ -55,6 +55,8 @@ try {
   Push-Location $repoRoot
   npx --yes supabase@latest link --project-ref $projectRef --password $kutt['DB_PASSWORD']
   if ($LASTEXITCODE -ne 0) { throw 'Não foi possível vincular o projeto Supabase. Confira se o token tem acesso ao projeto.' }
+  npx --yes supabase@latest db push --linked --password $kutt['DB_PASSWORD']
+  if ($LASTEXITCODE -ne 0) { throw 'Não foi possível aplicar as migrações pendentes do banco.' }
   npx --yes supabase@latest secrets set --env-file $secretFile --project-ref $projectRef
   if ($LASTEXITCODE -ne 0) { throw 'Não foi possível configurar os secrets no Supabase.' }
   npx --yes supabase@latest functions deploy kutt-short-links --project-ref $projectRef --no-verify-jwt

@@ -37,7 +37,7 @@ As migrações SQL `202610050001` e `202610050002` criam as tabelas e políticas
 
 ## Acesso e pagamentos
 
-O login envia um código de seis dígitos pelo WhatsApp e cria uma sessão de três horas. O telefone `OWNER_PHONE` é o único administrador; usuários comuns só veem os próprios links, cadastram a própria chave Pix e solicitam saque. O administrador confere a solicitação, aprova, faz o Pix por fora e marca como pago no painel.
+No primeiro acesso, um código de seis dígitos enviado pelo WhatsApp confirma o telefone e libera o cadastro de senha. A senha é armazenada como hash PBKDF2-SHA-256 com salt aleatório, nunca em texto aberto. Nos 48 horas após cada verificação do WhatsApp, a senha permite iniciar uma nova sessão; após esse prazo, a senha continua obrigatória e o sistema envia um novo código ao WhatsApp. Cada sessão expira em três horas. O telefone `OWNER_PHONE` é o único administrador; usuários comuns só veem os próprios links, cadastram a própria chave Pix e solicitam saque. O administrador confere a solicitação, aprova, faz o Pix por fora e marca como pago no painel.
 
 O painel calcula R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Essa regra deve ser mantida separada de impressões/cliques do Google AdSense; a página de redirecionamento não carrega código AdSense.
 

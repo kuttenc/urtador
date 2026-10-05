@@ -13,7 +13,7 @@
     <p>Esta política explica quais informações o Urtador trata quando alguém entra, cria ou acessa um link curto. O Urtador é um projeto independente de encurtamento de links.</p>
     <h2>Informações tratadas</h2><ul>
       <li>Ao criar um link: endereço de destino, final curto escolhido (quando informado), anotação opcional e data de criação.</li>
-      <li>Ao entrar: número de celular com DDD e código temporário enviado pelo WhatsApp para verificar o acesso. O código é armazenado como hash e a sessão autenticada expira em 3 horas.</li>
+      <li>Ao entrar: número de celular com DDD, senha armazenada como hash com salt e código temporário enviado pelo WhatsApp. A senha é definida após a primeira confirmação; a senha e o código serão exigidos novamente depois de 48 horas. Cada sessão autenticada expira em 3 horas.</li>
       <li>Ao pedir pagamento: chave Pix e histórico/status da solicitação. O pagamento é conferido e realizado manualmente pelo administrador.</li>
       <li>Para limitar abusos: endereço IP transformado em hash e registros técnicos de uso do serviço.</li>
       <li>Ao abrir um link: horário do acesso, identificador do link, IP transformado em hash, agente do navegador e página de referência quando enviados pelo navegador. A contagem de visitas qualificadas é usada para exibir o saldo promocional, quando aplicável.</li>

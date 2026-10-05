@@ -4,7 +4,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#075b57">
-    <meta name="google-adsense-account" content="ca-pub-6464589391694014">
     <meta name="description" content="Crie links curtos para compartilhar páginas de atendimento, cardápios, produtos e campanhas. Ferramenta simples em português para pequenos negócios.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://kuttenc.github.io/urtador/">
@@ -13,7 +12,6 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6464589391694014" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="assets/styles.css">
   </head>
   <body>
@@ -28,19 +26,27 @@
           <div class="hero">
             <p class="eyebrow">Urtador • links e divulgação</p>
             <h1 id="main-title">Crie links curtos e acompanhe sua divulgação.</h1>
-            <p>Entre com seu WhatsApp. Você poderá criar links, acompanhar visitas qualificadas e solicitar seu saldo por Pix.</p>
+            <p>Entre com seu telefone e senha. Na primeira entrada, confirme o WhatsApp e cadastre uma senha para facilitar os próximos acessos.</p>
             <section id="auth-view" class="panel" aria-label="Acesso por WhatsApp">
-              <form id="phone-form">
-                <div class="field"><label for="phone">Seu celular com DDD</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
-                <button class="button" type="submit">Receber código no WhatsApp</button>
+              <form id="password-login-form">
+                <div class="field"><label for="login-phone">Seu celular com DDD</label><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
+                <div class="field"><label for="login-password">Sua senha</label><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required></div>
+                <button class="button" type="submit">Entrar</button>
               </form>
+              <button class="button secondary" type="button" id="first-access-button">Primeiro acesso: receber código</button>
               <form id="otp-form" hidden>
                 <div class="field"><label for="otp">Código de 6 dígitos</label><input id="otp" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></div>
-                <button class="button" type="submit">Confirmar e entrar</button>
-                <button class="button secondary" type="button" id="change-phone">Trocar telefone</button>
+                <button class="button" type="submit">Confirmar código</button>
+                <button class="button secondary" type="button" id="change-phone">Voltar</button>
+              </form>
+              <form id="set-password-form" hidden>
+                <p class="field-help">WhatsApp confirmado. Crie sua senha para concluir o primeiro acesso.</p>
+                <div class="field"><label for="new-password">Crie uma senha</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
+                <div class="field"><label for="confirm-password">Confirme a senha</label><input id="confirm-password" name="password-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
+                <button class="button" type="submit">Salvar senha</button>
               </form>
               <p class="message" id="auth-message" aria-live="polite"></p>
-              <small class="field-help">A sessão fica ativa por 3 horas neste navegador.</small>
+              <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação do WhatsApp; depois, pediremos senha e código novamente.</small>
             </section>
 
             <section id="dashboard-view" hidden>
@@ -84,7 +90,7 @@
 
           <aside class="stats" aria-label="Como funciona">
             <h2>Simples para começar</h2>
-            <dl><div><dt>Acesso</dt><dd>WhatsApp</dd></div><div><dt>Sessão</dt><dd>3 horas</dd></div><div><dt>Links</dt><dd>Seu painel</dd></div><div><dt>Pagamento</dt><dd>Pix manual</dd></div></dl>
+            <dl><div><dt>Acesso</dt><dd>Senha e WhatsApp</dd></div><div><dt>Sessão</dt><dd>3 horas</dd></div><div><dt>Verificação</dt><dd>A cada 48 horas</dd></div><div><dt>Pagamento</dt><dd>Pix manual</dd></div></dl>
             <p class="notice">Compartilhe somente links confiáveis. Confirme o endereço de destino antes de divulgar.</p>
           </aside>
         </section>

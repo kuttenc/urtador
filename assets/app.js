@@ -57,6 +57,13 @@
     el("dashboard-view").hidden = !on;
   }
 
+  function showAuth(mode) {
+    el("password-login-form").hidden = mode !== "password";
+    el("first-access-button").hidden = mode !== "password";
+    el("otp-form").hidden = mode !== "otp";
+    el("set-password-form").hidden = mode !== "set-password";
+  }
+
   async function refreshDashboard() {
     const data = await api("me");
     state.data = data;
@@ -125,14 +132,35 @@
     }
   }
 
-  el("phone-form")?.addEventListener("submit", async (event) => {
+  el("password-login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const phone = el("phone").value.trim();
+    const phone = el("login-phone").value.trim();
+    const password = el("login-password").value;
+    state.phone = phone; sessionStorage.setItem("urtador-phone", phone);
+    say(el("auth-message"), "Conferindo seus dados…");
+    try {
+      const result = await api("login-password", { phone, password });
+      if (result.otpRequired) {
+        showAuth("otp");
+        say(el("auth-message"), "Senha confirmada. Digite também o código enviado pelo WhatsApp.");
+        return;
+      }
+      state.token = result.token; state.user = result.user;
+      sessionStorage.setItem("urtador-token", result.token);
+      await refreshDashboard();
+      say(el("auth-message"), "Acesso confirmado.");
+    } catch (error) { say(el("auth-message"), error.message, true); }
+  });
+
+  el("first-access-button")?.addEventListener("click", async () => {
+    const phoneInput = el("login-phone");
+    if (!phoneInput.reportValidity()) return;
+    const phone = phoneInput.value.trim();
+    state.phone = phone; sessionStorage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Enviando código…");
     try {
       await api("request-otp", { phone });
-      sessionStorage.setItem("urtador-phone", phone); state.phone = phone;
-      el("phone-form").hidden = true; el("otp-form").hidden = false;
+      showAuth("otp");
       say(el("auth-message"), "Código enviado pelo WhatsApp. Digite os 6 números recebidos.");
     } catch (error) { say(el("auth-message"), error.message, true); }
   });
@@ -144,16 +172,36 @@
       const result = await api("verify-otp", { phone: state.phone, code: el("otp").value });
       state.token = result.token; state.user = result.user;
       sessionStorage.setItem("urtador-token", result.token);
+      if (result.passwordSetupRequired) {
+        showAuth("set-password");
+        say(el("auth-message"), "WhatsApp confirmado. Agora cadastre sua senha.");
+        return;
+      }
       await refreshDashboard();
       say(el("auth-message"), "Acesso confirmado.");
     } catch (error) { say(el("auth-message"), error.message, true); }
   });
 
-  el("change-phone")?.addEventListener("click", () => { el("phone-form").hidden = false; el("otp-form").hidden = true; el("otp").value = ""; });
+  el("set-password-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const password = el("new-password").value;
+    if (password !== el("confirm-password").value) {
+      say(el("auth-message"), "As senhas não coincidem.", true);
+      return;
+    }
+    say(el("auth-message"), "Salvando sua senha…");
+    try {
+      const result = await api("set-password", { password });
+      await refreshDashboard();
+      say(el("auth-message"), result.message);
+    } catch (error) { say(el("auth-message"), error.message, true); }
+  });
+
+  el("change-phone")?.addEventListener("click", () => { showAuth("password"); el("otp").value = ""; el("login-password").value = ""; say(el("auth-message"), ""); });
   el("logout-button")?.addEventListener("click", async () => {
     try { await api("logout"); } catch { /* The local session is still discarded if the network is unavailable. */ }
     state.token = ""; sessionStorage.removeItem("urtador-token"); sessionStorage.removeItem("urtador-phone");
-    setLoggedIn(false); el("phone-form").hidden = false; el("otp-form").hidden = true; say(el("auth-message"), "Você saiu da sua conta.");
+    setLoggedIn(false); showAuth("password"); el("login-password").value = ""; say(el("auth-message"), "Você saiu da sua conta.");
   });
 
   el("shortener-form")?.addEventListener("submit", async (event) => {
@@ -190,8 +238,8 @@
 
   if (state.token) {
     refreshDashboard().catch((error) => {
-      state.token = ""; sessionStorage.removeItem("urtador-token"); setLoggedIn(false);
+      state.token = ""; sessionStorage.removeItem("urtador-token"); setLoggedIn(false); showAuth("password");
       say(el("auth-message"), error.message, true);
     });
-  }
+  } else showAuth("password");
 })();

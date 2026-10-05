@@ -4,6 +4,7 @@ type Payload = {
   action?: string;
   phone?: string;
   code?: string;
+  password?: string;
   token?: string;
   url?: string;
   slug?: string;
@@ -53,6 +54,34 @@ async function hash(value: string) {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+function bytesToHex(value: Uint8Array) {
+  return Array.from(value).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function hexToBytes(value: string) {
+  if (!/^(?:[0-9a-f]{2})+$/i.test(value)) return new Uint8Array();
+  return new Uint8Array(value.match(/.{2}/g)!.map((b) => Number.parseInt(b, 16)));
+}
+
+async function derivePasswordHash(password: string, saltHex: string) {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: hexToBytes(saltHex), iterations: 310000, hash: "SHA-256" }, key, 256);
+  return bytesToHex(new Uint8Array(bits));
+}
+
+function secureEqual(left: string, right: string) {
+  if (left.length !== right.length) return false;
+  let diff = 0;
+  for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+  return diff === 0;
+}
+
+function validatePassword(input: unknown) {
+  const password = String(input ?? "");
+  if (password.length < 10 || password.length > 128) throw new Error("A senha precisa ter de 10 a 128 caracteres.");
+  return password;
+}
+
 function clientIp(request: Request) {
   return request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
@@ -74,20 +103,22 @@ function bearer(request: Request) {
   return request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ?? "";
 }
 
-async function requireUser(request: Request, payload: Payload) {
+async function requireUser(request: Request, payload: Payload, allowPasswordSetup = false) {
   const token = String(payload.token || bearer(request));
   if (!token || token.length < 20) throw new Error("Entre com seu telefone para continuar.");
   const tokenHash = await hash(token);
   const { data, error } = await supabase.from("kutt_sessions")
-    .select("id, expires_at, user:kutt_users(id, phone, role, pix_key)")
+    .select("id, expires_at, user:kutt_users(id, phone, role, pix_key, password_hash)")
     .eq("token_hash", tokenHash).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
   if (error) throw error;
   if (!data?.user) throw new Error("Sua sessão expirou. Entre novamente pelo WhatsApp.");
-  return { session: data, user: Array.isArray(data.user) ? data.user[0] : data.user };
+  const user = Array.isArray(data.user) ? data.user[0] : data.user;
+  if (!allowPasswordSetup && !user.password_hash) throw new Error("Cadastre sua senha para continuar.");
+  return { session: data, user };
 }
 
-async function rateLimit(request: Request, action: string, limit: number, minutes: number) {
-  const ipHash = await hash(clientIp(request));
+async function rateLimitIdentity(action: string, identity: string, limit: number, minutes: number) {
+  const ipHash = await hash(identity);
   const since = new Date(Date.now() - minutes * 60000).toISOString();
   const { count, error } = await supabase.from("kutt_short_link_rate_limits").select("id", { count: "exact", head: true })
     .eq("action", action).eq("ip_hash", ipHash).gte("created_at", since);
@@ -98,6 +129,10 @@ async function rateLimit(request: Request, action: string, limit: number, minute
   return ipHash;
 }
 
+async function rateLimit(request: Request, action: string, limit: number, minutes: number) {
+  return await rateLimitIdentity(action, clientIp(request), limit, minutes);
+}
+
 async function sendWhatsApp(phone: string, message: string) {
   if (!greenApiUrl || !greenApiInstance || !greenApiToken) throw new Error("O envio de código ainda não está configurado no servidor.");
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
@@ -106,9 +141,8 @@ async function sendWhatsApp(phone: string, message: string) {
   if (!response.ok || result?.error) throw new Error("O WhatsApp não aceitou o envio do código. Tente novamente mais tarde.");
 }
 
-async function requestOtp(request: Request, payload: Payload) {
+async function issueOtp(request: Request, phone: string, passwordVerified: boolean) {
   await rateLimit(request, "otp-ip", 8, 60);
-  const phone = normalizePhone(payload.phone ?? "");
   const since = new Date(Date.now() - 15 * 60000).toISOString();
   const { count, error: countError } = await supabase.from("kutt_otp_challenges").select("id", { count: "exact", head: true })
     .eq("phone", phone).gte("created_at", since);
@@ -118,7 +152,7 @@ async function requestOtp(request: Request, payload: Payload) {
   const codeHash = await hash(`${phone}:${code}:${otpPepper}`);
   const expiresAt = new Date(Date.now() + 10 * 60000).toISOString();
   const { data: challenge, error } = await supabase.from("kutt_otp_challenges")
-    .insert({ phone, code_hash: codeHash, expires_at: expiresAt }).select("id").single();
+    .insert({ phone, code_hash: codeHash, expires_at: expiresAt, password_verified: passwordVerified }).select("id").single();
   if (error) throw error;
   try {
     await sendWhatsApp(phone, `Seu código do Urtador é ${code}. Ele vence em 10 minutos. Não compartilhe este código.`);
@@ -129,12 +163,62 @@ async function requestOtp(request: Request, payload: Payload) {
   return { ok: true, message: "Código enviado pelo WhatsApp. Ele vale por 10 minutos." };
 }
 
+async function requestOtp(request: Request, payload: Payload) {
+  const phone = normalizePhone(payload.phone ?? "");
+  const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).maybeSingle();
+  if (error) throw error;
+  if (user?.password_hash) throw new Error("Entre com sua senha. Após 48 horas, o código será enviado depois da validação da senha.");
+  return await issueOtp(request, phone, false);
+}
+
+async function createSession(user: { id: string; phone: string; role: string; pix_key: string | null }) {
+  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, "")}`;
+  const { error } = await supabase.from("kutt_sessions").insert({ user_id: user.id, token_hash: await hash(token), expires_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() });
+  if (error) throw error;
+  return { token, expiresInSeconds: 10800, user: { phone: user.phone, role: user.role, pixKey: user.pix_key } };
+}
+
+async function loginWithPassword(request: Request, payload: Payload) {
+  await rateLimit(request, "password-login-ip", 12, 60);
+  const phone = normalizePhone(payload.phone ?? "");
+  await rateLimitIdentity("password-login-phone", phone, 8, 15);
+  const password = validatePassword(payload.password);
+  const { data: user, error } = await supabase.from("kutt_users")
+    .select("id, phone, role, pix_key, password_hash, password_salt, otp_verified_at")
+    .eq("phone", phone).maybeSingle();
+  if (error) throw error;
+  if (!user?.password_hash || !user.password_salt) throw new Error("Primeiro acesso: confirme seu WhatsApp para cadastrar uma senha.");
+  const candidate = await derivePasswordHash(password, user.password_salt);
+  if (!secureEqual(candidate, user.password_hash)) throw new Error("Telefone ou senha incorretos.");
+  const lastOtp = user.otp_verified_at ? new Date(user.otp_verified_at).getTime() : 0;
+  if (Date.now() - lastOtp >= 48 * 60 * 60 * 1000) {
+    await issueOtp(request, phone, true);
+    return { otpRequired: true, phone, message: "Senha confirmada. Digite também o código enviado pelo WhatsApp." };
+  }
+  return await createSession(user);
+}
+
+async function setPassword(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload, true);
+  const password = validatePassword(payload.password);
+  const { data: existing, error: readError } = await supabase.from("kutt_users").select("password_hash").eq("id", user.id).single();
+  if (readError) throw readError;
+  if (existing.password_hash) throw new Error("A senha já foi cadastrada. Fale com o administrador para redefini-la.");
+  const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  const passwordHash = await derivePasswordHash(password, salt);
+  const { data, error } = await supabase.from("kutt_users").update({ password_salt: salt, password_hash: passwordHash, updated_at: new Date().toISOString() })
+    .eq("id", user.id).is("password_hash", null).select("id").maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error("A senha já foi cadastrada nesta conta. Atualize a página e entre com ela.");
+  return { ok: true, message: "Senha cadastrada. Use-a nos próximos acessos; a cada 48 horas o WhatsApp também será confirmado." };
+}
+
 async function verifyOtp(request: Request, payload: Payload) {
   await rateLimit(request, "otp-verify-ip", 20, 60);
   const phone = normalizePhone(payload.phone ?? "");
   const code = String(payload.code ?? "").replace(/\D/g, "");
   if (!/^\d{6}$/.test(code)) throw new Error("Digite os 6 números recebidos no WhatsApp.");
-  const { data: challenge, error } = await supabase.from("kutt_otp_challenges").select("id, code_hash, attempts")
+  const { data: challenge, error } = await supabase.from("kutt_otp_challenges").select("id, code_hash, attempts, password_verified")
     .eq("phone", phone).is("consumed_at", null).gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
   if (error) throw error;
@@ -143,16 +227,16 @@ async function verifyOtp(request: Request, payload: Payload) {
     await supabase.from("kutt_otp_challenges").update({ attempts: challenge.attempts + 1 }).eq("id", challenge.id);
     throw new Error("Código incorreto. Confira a mensagem e tente de novo.");
   }
+  const { data: knownUser, error: knownUserError } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).maybeSingle();
+  if (knownUserError) throw knownUserError;
+  if (knownUser?.password_hash && !challenge.password_verified) throw new Error("Esta conta exige a senha antes do código do WhatsApp.");
   await supabase.from("kutt_otp_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id);
   const isAdmin = phone === ownerPhone;
   const { data: user, error: userError } = await supabase.from("kutt_users")
-    .upsert({ phone, role: isAdmin ? "admin" : "user" }, { onConflict: "phone", ignoreDuplicates: false })
+    .upsert({ phone, role: isAdmin ? "admin" : "user", otp_verified_at: new Date().toISOString() }, { onConflict: "phone", ignoreDuplicates: false })
     .select("id, phone, role, pix_key").single();
   if (userError) throw userError;
-  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, "")}`;
-  const { error: sessionError } = await supabase.from("kutt_sessions").insert({ user_id: user.id, token_hash: await hash(token), expires_at: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString() });
-  if (sessionError) throw sessionError;
-  return { token, expiresInSeconds: 10800, user: { phone: user.phone, role: user.role, pixKey: user.pix_key } };
+  return { ...await createSession(user), passwordSetupRequired: !knownUser?.password_hash };
 }
 
 async function profile(request: Request, payload: Payload) {
@@ -288,6 +372,8 @@ Deno.serve(async (request) => {
     switch (payload.action) {
       case "request-otp": return json(request, 200, await requestOtp(request, payload));
       case "verify-otp": return json(request, 200, await verifyOtp(request, payload));
+      case "login-password": return json(request, 200, await loginWithPassword(request, payload));
+      case "set-password": return json(request, 200, await setPassword(request, payload));
       case "me": return json(request, 200, await profile(request, payload));
       case "create": return json(request, 200, await createLink(request, payload));
       case "resolve": return json(request, 200, await resolveLink(request, payload));
