@@ -8,7 +8,8 @@
     passwordSetupRequired: storage.getItem("urtador-password-setup") === "1",
     resumingDraft: false,
     user: null,
-    data: null
+    data: null,
+    activeDashboardPage: ""
   };
   const el = (id) => document.getElementById(id);
 
@@ -68,6 +69,21 @@
   function setLoggedIn(on) {
     el("auth-view").hidden = on;
     el("dashboard-view").hidden = !on;
+    el("auth-intro").hidden = on;
+    document.body.classList.toggle("dashboard-mode", on);
+    document.querySelectorAll('.site-nav a[href="#auth-view"]').forEach((link) => { link.hidden = on; });
+  }
+
+  function showDashboardPage(name) {
+    if (name === "admin" && state.user?.role !== "admin") name = "overview";
+    document.querySelectorAll("[data-dashboard-area]").forEach((page) => {
+      page.hidden = page.dataset.dashboardArea !== name;
+    });
+    document.querySelectorAll("[data-dashboard-page]").forEach((button) => {
+      if (button.dataset.dashboardPage === name) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    });
+    state.activeDashboardPage = name;
   }
 
   function showAuth(mode) {
@@ -90,11 +106,19 @@
     state.data = data;
     state.user = data.user;
     setLoggedIn(true);
+    el("admin-nav-item").hidden = data.user.role !== "admin";
+    el("sidebar-phone").textContent = data.user.phone;
+    el("settings-phone").textContent = data.user.phone;
+    el("settings-role").textContent = data.user.role === "admin" ? "Administrador" : "Usuário";
+    showDashboardPage(state.activeDashboardPage || "overview");
     el("welcome-title").textContent = `Olá, ${data.user.phone}`;
     el("session-expiry").textContent = `Sua sessão expira às ${new Date(data.expiresAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
     el("eligible-count").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earned-balance").textContent = money(data.earnedCents);
     el("available-balance").textContent = money(data.availableCents);
+    el("earnings-visits").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
+    el("earnings-total").textContent = money(data.earnedCents);
+    el("earnings-available").textContent = money(data.availableCents);
     el("pix-key").value = data.user.pixKey || "";
     const linksBody = el("links-body");
     linksBody.replaceChildren();
@@ -113,7 +137,6 @@
       cell(row, date(item.requested_at)); cell(row, money(item.amount_cents)); cell(row, item.status === "pending" ? "Aguardando conferência" : item.status === "approved" ? "Aprovado para pagamento" : item.status === "paid" ? "Pago" : "Recusado");
       withdrawalsBody.append(row);
     }
-    el("admin-panel").hidden = data.user.role !== "admin";
     if (data.user.role === "admin") await refreshAdmin();
     resumePendingLink();
   }
@@ -139,7 +162,14 @@
   }
 
   async function refreshAdmin() {
-    const data = await api("admin-list");
+    say(el("admin-load-message"), "Consultando os dados administrativos…");
+    let data;
+    try {
+      data = await api("admin-list");
+    } catch (error) {
+      say(el("admin-load-message"), `Não foi possível carregar os dados: ${error.message}. Confira a conexão e tente Atualizar.`, true);
+      return;
+    }
     const summary = data.summary || {};
     el("admin-user-count").textContent = Number(summary.userCount || 0).toLocaleString("pt-BR");
     el("admin-link-count").textContent = Number(summary.linkCount || 0).toLocaleString("pt-BR");
@@ -187,6 +217,7 @@
       const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
       cell(row, Number(item.click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
     }
+    say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
   }
 
   el("password-login-form")?.addEventListener("submit", async (event) => {
@@ -270,11 +301,16 @@
   });
 
   el("change-phone")?.addEventListener("click", () => { showAuth("password"); el("otp").value = ""; el("login-password").value = ""; say(el("auth-message"), ""); });
-  el("logout-button")?.addEventListener("click", async () => {
+  document.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", async () => {
     try { await api("logout"); } catch { /* The local session is still discarded if the network is unavailable. */ }
     state.token = ""; state.passwordSetupRequired = false; storage.removeItem("urtador-token"); storage.removeItem("urtador-phone"); storage.removeItem("urtador-password-setup");
+    state.user = null; state.activeDashboardPage = "";
     setLoggedIn(false); showAuth("password"); el("login-password").value = ""; say(el("auth-message"), "Você saiu da sua conta.");
-  });
+  }));
+
+  document.querySelectorAll("[data-dashboard-page]").forEach((button) => button.addEventListener("click", () => {
+    showDashboardPage(button.dataset.dashboardPage);
+  }));
 
   el("shortener-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -287,6 +323,7 @@
       storage.removeItem("urtador-pending-link");
       const anchor = el("short-link-result"); anchor.href = result.shortUrl; anchor.textContent = result.shortUrl; anchor.hidden = false;
       el("copy-link").disabled = false; say(el("link-message"), "Link criado. Copie e compartilhe.");
+      if (typeof window.gtag === "function") window.gtag("event", "urtador_link_created", { event_category: "engagement", event_label: "short_link" });
       await refreshDashboard();
     } catch (error) {
       if (resumedDraft) storage.setItem("urtador-pending-link", JSON.stringify({url: el("url").value, slug: el("slug").value, title: el("title").value, savedAt: Date.now()}));

@@ -12,8 +12,15 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20261005-mobile-nav-fix">
-  </head>
+    <link rel="stylesheet" href="assets/styles.css?v=20261005-teuzin-layout">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-18495877040');
+</script>
+</head>
   <body>
     <div class="shell">
       <header class="topbar">
@@ -24,9 +31,11 @@
       <main>
         <section class="layout" aria-labelledby="main-title">
           <div class="hero">
-            <p class="eyebrow">Urtador • links e divulgação</p>
-            <h1 id="main-title">Crie links curtos e acompanhe sua divulgação.</h1>
-            <p>Entre com seu telefone e senha. Na primeira entrada, confirme o WhatsApp e cadastre uma senha para facilitar os próximos acessos.</p>
+            <div id="auth-intro">
+              <p class="eyebrow">Urtador • links e divulgação</p>
+              <h1 id="main-title">Crie links curtos e acompanhe sua divulgação.</h1>
+              <p>Entre com seu telefone e senha. Na primeira entrada, confirme o WhatsApp e cadastre uma senha para facilitar os próximos acessos.</p>
+            </div>
             <section id="auth-view" class="panel" aria-label="Acesso por WhatsApp">
               <form id="password-login-form">
                 <div class="field"><label for="login-phone">Seu celular com DDD</label><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
@@ -57,64 +66,98 @@
             </section>
 
             <section id="dashboard-view" hidden>
-              <div class="dashboard-head"><div><p class="eyebrow">Painel</p><h2 id="welcome-title">Bem-vindo</h2><p id="session-expiry" class="field-help"></p></div><button id="logout-button" class="button secondary" type="button">Sair</button></div>
-              <div class="balance-grid">
-                <article class="balance-card"><span>Visitas válidas</span><strong id="eligible-count">0</strong></article>
-                <article class="balance-card"><span>Saldo acumulado</span><strong id="earned-balance">R$ 0,00</strong></article>
-                <article class="balance-card"><span>Disponível para solicitar</span><strong id="available-balance">R$ 0,00</strong></article>
-              </div>
+              <div class="workspace">
+                <aside class="workspace-sidebar" aria-label="Menu do painel">
+                  <div class="workspace-brand"><span class="workspace-brand-mark" aria-hidden="true">ϟ</span><div><strong>TEUZIN FF</strong><small>links e divulgação</small></div></div>
+                  <nav class="workspace-nav" aria-label="Seções do painel">
+                    <button type="button" data-dashboard-page="overview" aria-current="page"><span class="workspace-icon" aria-hidden="true">⌂</span>Painel</button>
+                    <button type="button" data-dashboard-page="links"><span class="workspace-icon" aria-hidden="true">↗</span>Links</button>
+                    <button type="button" data-dashboard-page="earnings"><span class="workspace-icon" aria-hidden="true">◉</span>Saldo e ganhos</button>
+                    <button type="button" data-dashboard-page="payouts"><span class="workspace-icon" aria-hidden="true">◇</span>Saque Pix</button>
+                    <button type="button" data-dashboard-page="support"><span class="workspace-icon" aria-hidden="true">?</span>Suporte</button>
+                    <button type="button" data-dashboard-page="settings"><span class="workspace-icon" aria-hidden="true">⚙</span>Configurações</button>
+                    <button id="admin-nav-item" type="button" data-dashboard-page="admin" hidden><span class="workspace-icon" aria-hidden="true">▦</span>Administração</button>
+                  </nav>
+                  <div class="workspace-sidebar-footer"><div class="workspace-user"><small>Conta conectada</small><span id="sidebar-phone">—</span></div><button class="workspace-logout" type="button" data-logout><span class="workspace-icon" aria-hidden="true">⇥</span>Sair</button></div>
+                </aside>
 
-              <form class="panel dashboard-panel" id="shortener-form">
-                <h3>Criar link curto</h3>
-                <div class="field"><label for="url">Cole o endereço que quer divulgar</label><input id="url" name="url" type="url" placeholder="https://seusite.com.br/pagina" autocomplete="url" required></div>
-                <div class="field"><label for="slug">Final personalizado <span>opcional</span></label><input id="slug" name="slug" type="text" placeholder="minha-oferta" maxlength="48" pattern="[A-Za-z0-9_-]+"></div>
-                <div class="field"><label for="title">Nome para identificar <span>opcional</span></label><input id="title" name="title" type="text" placeholder="Campanha de outubro" maxlength="120"></div>
-                <div class="actions"><button class="button" type="submit">Encurtar link</button><button class="button secondary" type="button" id="copy-link" disabled>Copiar</button></div>
-                <p class="message" id="link-message" aria-live="polite"></p>
-                <a id="short-link-result" class="short-url" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
-              </form>
+                <div class="workspace-main">
+                  <header class="workspace-header"><div><p class="eyebrow">TEUZIN FF · PAINEL</p><h2 id="welcome-title">Bem-vindo</h2><p id="session-expiry" class="field-help"></p></div></header>
 
-              <section class="panel dashboard-panel">
-                <h3>Seus links</h3><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Link</th><th>Visitas</th><th>Criado</th></tr></thead><tbody id="links-body"></tbody></table></div>
-              </section>
+                  <section class="workspace-page" data-dashboard-area="overview">
+                    <div class="balance-grid">
+                      <article class="balance-card"><span>Visitas qualificadas</span><strong id="eligible-count">0</strong></article>
+                      <article class="balance-card"><span>Saldo acumulado</span><strong id="earned-balance">R$ 0,00</strong></article>
+                      <article class="balance-card"><span>Disponível para solicitar</span><strong id="available-balance">R$ 0,00</strong></article>
+                    </div>
+                    <article class="support-card"><h3>Seu painel em um só lugar</h3><p>Crie e acompanhe seus links, confira o saldo registrado e gerencie solicitações de pagamento pelo menu. Os dados são atualizados ao entrar e após cada operação.</p></article>
+                  </section>
 
-              <section class="panel dashboard-panel">
-                <h3>Receber por Pix</h3><p class="field-help">Cadastre sua chave. Quando atingir o mínimo disponível, envie a solicitação; o administrador confere e paga manualmente.</p>
-                <form id="pix-form"><div class="field"><label for="pix-key">Sua chave Pix</label><input id="pix-key" name="pixKey" maxlength="120" autocomplete="off" placeholder="CPF, celular, e-mail ou chave aleatória" required></div><button class="button secondary" type="submit">Salvar chave Pix</button></form>
-                <button class="button" type="button" id="withdraw-button">Solicitar saque</button><p class="message" id="payout-message" aria-live="polite"></p>
-                <div class="table-wrap"><table><thead><tr><th>Solicitado</th><th>Valor</th><th>Status</th></tr></thead><tbody id="withdrawals-body"></tbody></table></div>
-              </section>
+                  <section class="workspace-page" data-dashboard-area="links" hidden>
+                    <form class="panel dashboard-panel" id="shortener-form">
+                      <h3>Criar link curto</h3>
+                      <div class="field"><label for="url">Cole o endereço que quer divulgar</label><input id="url" name="url" type="url" placeholder="https://seusite.com.br/pagina" autocomplete="url" required></div>
+                      <div class="field"><label for="slug">Final personalizado <span>opcional</span></label><input id="slug" name="slug" type="text" placeholder="minha-oferta" maxlength="48" pattern="[A-Za-z0-9_-]+"></div>
+                      <div class="field"><label for="title">Nome para identificar <span>opcional</span></label><input id="title" name="title" type="text" placeholder="Campanha de outubro" maxlength="120"></div>
+                      <div class="actions"><button class="button" type="submit">Encurtar link</button><button class="button secondary" type="button" id="copy-link" disabled>Copiar</button></div>
+                      <p class="message" id="link-message" aria-live="polite"></p>
+                      <a id="short-link-result" class="short-url" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+                    </form>
+                    <section class="panel dashboard-panel"><h3>Seus links</h3><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Link</th><th>Visitas</th><th>Criado</th></tr></thead><tbody id="links-body"></tbody></table></div></section>
+                  </section>
 
-              <section id="admin-panel" class="panel dashboard-panel" hidden>
-                <div class="dashboard-head"><div><p class="eyebrow">Administração</p><h3>Painel do proprietário</h3></div><button id="refresh-admin" class="button secondary" type="button">Atualizar</button></div>
-                <div class="balance-grid admin-summary-grid">
-                  <article class="balance-card"><span>Usuários</span><strong id="admin-user-count">—</strong></article>
-                  <article class="balance-card"><span>Links criados</span><strong id="admin-link-count">—</strong></article>
-                  <article class="balance-card"><span>Visitas qualificadas</span><strong id="admin-qualified-visits">—</strong></article>
-                  <article class="balance-card"><span>Pix aguardando pagamento</span><strong id="admin-pending-pix">—</strong></article>
-                  <article class="balance-card"><span>Pix já pagos</span><strong id="admin-paid-pix">—</strong></article>
+                  <section class="workspace-page" data-dashboard-area="earnings" hidden>
+                    <div class="balance-grid">
+                      <article class="balance-card"><span>Visitas qualificadas únicas</span><strong id="earnings-visits">0</strong></article>
+                      <article class="balance-card"><span>Saldo registrado</span><strong id="earnings-total">R$ 0,00</strong></article>
+                      <article class="balance-card"><span>Disponível para solicitar</span><strong id="earnings-available">R$ 0,00</strong></article>
+                    </div>
+                    <article class="earnings-note"><h3>Como ler estes números</h3><p>O contador e o saldo mostram os registros do Urtador conforme a regra vigente do serviço. A contagem não representa cliques em anúncios nem confirma receita do Google; o valor pode depender de validação e das regras de pagamento.</p></article>
+                  </section>
+
+                  <section class="workspace-page" data-dashboard-area="payouts" hidden>
+                    <div class="workspace-two-column">
+                      <section class="panel"><h3>Solicitar saque via Pix</h3><p class="field-help">Cadastre sua chave. Quando houver saldo disponível, envie a solicitação; o administrador confere e faz o pagamento manualmente.</p>
+                        <form id="pix-form"><div class="field"><label for="pix-key">Sua chave Pix</label><input id="pix-key" name="pixKey" maxlength="120" autocomplete="off" placeholder="CPF, celular, e-mail ou chave aleatória" required></div><button class="button secondary" type="submit">Salvar chave Pix</button></form>
+                        <button class="button" type="button" id="withdraw-button">Solicitar saque</button><p class="message" id="payout-message" aria-live="polite"></p>
+                      </section>
+                      <section class="panel"><h3>Histórico de saques</h3><div class="table-wrap"><table><thead><tr><th>Solicitado</th><th>Valor</th><th>Status</th></tr></thead><tbody id="withdrawals-body"></tbody></table></div></section>
+                    </div>
+                  </section>
+
+                  <section class="workspace-page" data-dashboard-area="support" hidden>
+                    <article class="support-card"><h3>Ajuda do Urtador</h3><p>Confira estas orientações antes de compartilhar um link:</p><ul class="support-list"><li>Teste o endereço original e o link curto antes de divulgar.</li><li>Não encurte endereços com senhas ou dados pessoais.</li><li>Se encontrar um erro, relate a tela e o horário sem incluir telefone, chave Pix, senha, código de WhatsApp ou links privados. As issues do GitHub são públicas.</li></ul><a class="button secondary" href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Abrir suporte do projeto</a></article>
+                  </section>
+
+                  <section class="workspace-page" data-dashboard-area="settings" hidden>
+                    <article class="settings-card"><h3>Conta e segurança</h3><div class="setting-row"><span>Telefone conectado</span><strong id="settings-phone">—</strong></div><div class="setting-row"><span>Perfil</span><strong id="settings-role">Usuário</strong></div><div class="setting-row"><span>Duração desta sessão</span><strong>3 horas</strong></div><div class="setting-row"><span>Confirmação pelo WhatsApp</span><strong>A cada 48 horas</strong></div><p>O Urtador não mostra nem solicita seu código fora da etapa de acesso. Para encerrar o acesso neste navegador, use “Sair” no menu.</p></article>
+                  </section>
+
+                  <section id="admin-panel" class="workspace-page panel dashboard-panel" data-dashboard-area="admin" hidden>
+                    <div class="dashboard-head"><div><p class="eyebrow">Administração</p><h3>Painel administrativo</h3></div><button id="refresh-admin" class="button secondary" type="button">Atualizar</button></div>
+                    <p id="admin-load-message" class="message" aria-live="polite">Carregando dados administrativos…</p>
+                    <div class="balance-grid admin-summary-grid">
+                      <article class="balance-card"><span>Usuários</span><strong id="admin-user-count">—</strong></article>
+                      <article class="balance-card"><span>Links criados</span><strong id="admin-link-count">—</strong></article>
+                      <article class="balance-card"><span>Visitas qualificadas</span><strong id="admin-qualified-visits">—</strong></article>
+                      <article class="balance-card"><span>Pix aguardando pagamento</span><strong id="admin-pending-pix">—</strong></article>
+                      <article class="balance-card"><span>Pix já pagos</span><strong id="admin-paid-pix">—</strong></article>
+                    </div>
+                    <h4>Atividade registrada — últimos 14 dias</h4>
+                    <p class="field-help">Visitas e solicitações vêm dos registros do Supabase. “Pix em aberto” soma solicitações aguardando conferência ou pagamento; não é uma previsão de receita de anúncios.</p>
+                    <div class="table-wrap"><table><thead><tr><th>Data</th><th>Visitas qualificadas</th><th>Solicitações Pix · total</th><th>Pix em aberto</th><th>Pix pagos</th></tr></thead><tbody id="admin-daily-body"></tbody></table></div>
+                    <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
+                    <h4>Usuários</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Perfil</th><th>Chave Pix</th><th>Cadastro</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
+                    <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Visitas totais</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
+                    <p class="notice">A contagem é do próprio serviço e não é uma auditoria de anúncios nem garantia de monetização. Pagamentos são conferidos e processados manualmente.</p>
+                  </section>
                 </div>
-                <h4>Atividade registrada — últimos 14 dias</h4>
-                <p class="field-help">Visitas e solicitações vêm dos registros do Supabase. “Pix em aberto” soma solicitações aguardando conferência ou pagamento; não é uma previsão de receita de anúncios.</p>
-                <div class="table-wrap"><table><thead><tr><th>Data</th><th>Visitas qualificadas</th><th>Solicitações Pix · total</th><th>Pix em aberto</th><th>Pix pagos</th></tr></thead><tbody id="admin-daily-body"></tbody></table></div>
-                <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
-                <h4>Usuários</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Perfil</th><th>Chave Pix</th><th>Cadastro</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
-                <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Visitas totais</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
-              </section>
-              <p class="notice">Os R$ 70 são saldo pendente por cada grupo de mil visitas qualificadas únicas. O administrador confere as solicitações e realiza os pagamentos via Pix manualmente. Visitas automatizadas são excluídas; a contagem não garante monetização por anúncios.</p>
+              </div>
             </section>
           </div>
 
-          <aside class="stats" aria-label="Como funciona">
-            <h2>Simples para começar</h2>
-            <dl><div><dt>Acesso</dt><dd>Senha e WhatsApp</dd></div><div><dt>Sessão</dt><dd>3 horas</dd></div><div><dt>Verificação</dt><dd>A cada 48 horas</dd></div><div><dt>Pagamento</dt><dd>Pix manual</dd></div></dl>
-            <div class="link-preview" aria-label="Prévia visual ilustrativa">
-              <div class="preview-caption"><span>LINK CURTO</span><span>EXEMPLO</span></div>
-              <div class="preview-address"><span class="preview-chain" aria-hidden="true">↗</span><div><small>SEU ENDEREÇO</small><strong>kuttenc.github.io/urtador/seu-link</strong></div></div>
-              <div class="preview-activity"><div><small>ACOMPANHAMENTO</small><strong>Acessos no seu painel</strong></div><svg viewBox="0 0 240 62" role="img" aria-label="Gráfico decorativo"><path d="M4 52 C28 46 25 29 52 38 S86 47 104 27 S139 30 155 21 S190 29 207 14 S226 15 236 6" /></svg></div>
-              <p>Prévia ilustrativa. Seus dados reais aparecem após entrar.</p>
-            </div>
-            <p class="notice">Compartilhe somente links confiáveis. Confirme o endereço de destino antes de divulgar.</p>
+          <aside class="login-art" aria-label="Arte promocional do Urtador">
+            <img src="assets/urtador-login-art.jpeg" alt="Arte promocional em preto e verde sobre links curtos e pagamentos via Pix" width="1150" height="1368" fetchpriority="high">
           </aside>
         </section>
 
@@ -140,6 +183,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261005-admin-forecast"></script>
+    <script src="assets/app.js?v=20261005-teuzin-layout"></script>
   </body>
 </html>
