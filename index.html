@@ -12,7 +12,7 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css">
+    <link rel="stylesheet" href="assets/styles.css?v=20261005-otp-password">
   </head>
   <body>
     <div class="shell">
@@ -41,7 +41,7 @@
               </form>
               <form id="set-password-form" hidden>
                 <p class="field-help">WhatsApp confirmado. Crie sua senha para concluir o primeiro acesso.</p>
-                <div class="field"><label for="new-password">Crie uma senha</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
+                <div class="field"><label for="new-password">Crie uma senha</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" aria-describedby="password-help" required><small id="password-help" class="field-help">Use pelo menos 10 caracteres. Você usará essa senha nos próximos acessos.</small></div>
                 <div class="field"><label for="confirm-password">Confirme a senha</label><input id="confirm-password" name="password-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
                 <button class="button" type="submit">Salvar senha</button>
               </form>
@@ -116,7 +116,7 @@
 
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
-    <script src="assets/config.js"></script>
-    <script src="assets/app.js"></script>
+    <script src="assets/config.js?v=20261005-otp-password"></script>
+    <script src="assets/app.js?v=20261005-otp-password"></script>
   </body>
 </html>

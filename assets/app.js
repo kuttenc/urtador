@@ -174,7 +174,8 @@
       sessionStorage.setItem("urtador-token", result.token);
       if (result.passwordSetupRequired) {
         showAuth("set-password");
-        say(el("auth-message"), "WhatsApp confirmado. Agora cadastre sua senha.");
+        say(el("auth-message"), "WhatsApp confirmado. Crie sua senha abaixo para concluir o primeiro acesso.");
+        el("new-password").focus();
         return;
       }
       await refreshDashboard();
@@ -187,6 +188,12 @@
     const password = el("new-password").value;
     if (password !== el("confirm-password").value) {
       say(el("auth-message"), "As senhas não coincidem.", true);
+      el("confirm-password").focus();
+      return;
+    }
+    if (password.length < 10 || password.length > 128) {
+      say(el("auth-message"), "A senha precisa ter de 10 a 128 caracteres.", true);
+      el("new-password").focus();
       return;
     }
     say(el("auth-message"), "Salvando sua senha…");
