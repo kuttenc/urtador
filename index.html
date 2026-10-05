@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#075b57">
+    <meta name="theme-color" content="#07111f">
     <meta name="description" content="Crie links curtos para compartilhar páginas de atendimento, cardápios, produtos e campanhas. Ferramenta simples em português para pequenos negócios.">
     <meta name="robots" content="index,follow">
     <link rel="canonical" href="https://kuttenc.github.io/urtador/">
@@ -12,7 +12,7 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20261005-session-draft">
+    <link rel="stylesheet" href="assets/styles.css?v=20261005-visual">
   </head>
   <body>
     <div class="shell">
@@ -87,6 +87,16 @@
 
               <section id="admin-panel" class="panel dashboard-panel" hidden>
                 <div class="dashboard-head"><div><p class="eyebrow">Administração</p><h3>Painel do proprietário</h3></div><button id="refresh-admin" class="button secondary" type="button">Atualizar</button></div>
+                <div class="balance-grid admin-summary-grid">
+                  <article class="balance-card"><span>Usuários</span><strong id="admin-user-count">—</strong></article>
+                  <article class="balance-card"><span>Links criados</span><strong id="admin-link-count">—</strong></article>
+                  <article class="balance-card"><span>Visitas qualificadas</span><strong id="admin-qualified-visits">—</strong></article>
+                  <article class="balance-card"><span>Pix aguardando pagamento</span><strong id="admin-pending-pix">—</strong></article>
+                  <article class="balance-card"><span>Pix já pagos</span><strong id="admin-paid-pix">—</strong></article>
+                </div>
+                <h4>Atividade registrada — últimos 14 dias</h4>
+                <p class="field-help">Visitas e solicitações vêm dos registros do Supabase. “Pix em aberto” soma solicitações aguardando conferência ou pagamento; não é uma previsão de receita de anúncios.</p>
+                <div class="table-wrap"><table><thead><tr><th>Data</th><th>Visitas qualificadas</th><th>Solicitações Pix · total</th><th>Pix em aberto</th><th>Pix pagos</th></tr></thead><tbody id="admin-daily-body"></tbody></table></div>
                 <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
                 <h4>Usuários</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Perfil</th><th>Chave Pix</th><th>Cadastro</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
                 <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Visitas totais</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
@@ -98,6 +108,12 @@
           <aside class="stats" aria-label="Como funciona">
             <h2>Simples para começar</h2>
             <dl><div><dt>Acesso</dt><dd>Senha e WhatsApp</dd></div><div><dt>Sessão</dt><dd>3 horas</dd></div><div><dt>Verificação</dt><dd>A cada 48 horas</dd></div><div><dt>Pagamento</dt><dd>Pix manual</dd></div></dl>
+            <div class="link-preview" aria-label="Prévia visual ilustrativa">
+              <div class="preview-caption"><span>LINK CURTO</span><span>EXEMPLO</span></div>
+              <div class="preview-address"><span class="preview-chain" aria-hidden="true">↗</span><div><small>SEU ENDEREÇO</small><strong>kuttenc.github.io/urtador/seu-link</strong></div></div>
+              <div class="preview-activity"><div><small>ACOMPANHAMENTO</small><strong>Acessos no seu painel</strong></div><svg viewBox="0 0 240 62" role="img" aria-label="Gráfico decorativo"><path d="M4 52 C28 46 25 29 52 38 S86 47 104 27 S139 30 155 21 S190 29 207 14 S226 15 236 6" /></svg></div>
+              <p>Prévia ilustrativa. Seus dados reais aparecem após entrar.</p>
+            </div>
             <p class="notice">Compartilhe somente links confiáveis. Confirme o endereço de destino antes de divulgar.</p>
           </aside>
         </section>
@@ -124,6 +140,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261005-session-draft"></script>
+    <script src="assets/app.js?v=20261005-admin-forecast"></script>
   </body>
 </html>

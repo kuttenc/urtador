@@ -19,6 +19,7 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const publicBaseUrl = (Deno.env.get("PUBLIC_BASE_URL") ?? "https://kuttenc.github.io/urtador").replace(/\/$/, "");
 const ownerPhone = normalizePhone(Deno.env.get("OWNER_PHONE") ?? "11989346164");
+const adminPhones = new Set([ownerPhone, ...(Deno.env.get("ADMIN_PHONES") ?? "").split(",").map((phone) => phone.trim()).filter(Boolean).map(normalizePhone)]);
 const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
 const greenApiUrl = (Deno.env.get("GREEN_API_URL") ?? "").replace(/\/$/, "");
 const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID") ?? "";
@@ -195,7 +196,12 @@ async function loginWithPassword(request: Request, payload: Payload) {
     await issueOtp(request, phone, true);
     return { otpRequired: true, phone, message: "Senha confirmada. Digite também o código enviado pelo WhatsApp." };
   }
-  return await createSession(user);
+  const role = adminPhones.has(phone) ? "admin" : "user";
+  if (user.role !== role) {
+    const { error: roleError } = await supabase.from("kutt_users").update({ role }).eq("id", user.id);
+    if (roleError) throw roleError;
+  }
+  return await createSession({ ...user, role });
 }
 
 async function setPassword(request: Request, payload: Payload) {
@@ -231,7 +237,7 @@ async function verifyOtp(request: Request, payload: Payload) {
   if (knownUserError) throw knownUserError;
   if (knownUser?.password_hash && !challenge.password_verified) throw new Error("Esta conta exige a senha antes do código do WhatsApp.");
   await supabase.from("kutt_otp_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id);
-  const isAdmin = phone === ownerPhone;
+  const isAdmin = adminPhones.has(phone);
   const { data: user, error: userError } = await supabase.from("kutt_users")
     .upsert({ phone, role: isAdmin ? "admin" : "user", otp_verified_at: new Date().toISOString() }, { onConflict: "phone", ignoreDuplicates: false })
     .select("id, phone, role, pix_key").single();
@@ -335,17 +341,72 @@ async function requestWithdrawal(request: Request, payload: Payload) {
   return { ok: true, amountCents: amount, message: "Solicitação enviada. O administrador fará o pagamento via Pix após conferir as visitas." };
 }
 
+async function readAllRows(table: string, columns: string, orderBy: string) {
+  const pageSize = 1000;
+  const rows: Record<string, any>[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from(table).select(columns).order(orderBy, { ascending: false }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) return rows;
+  }
+}
+
+function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<string, any>[], links: Record<string, any>[], visits: Record<string, any>[]) {
+  const visitsByDay = new Map<string, number>();
+  for (const visit of visits) {
+    const day = String(visit.visit_day).slice(0, 10);
+    visitsByDay.set(day, (visitsByDay.get(day) ?? 0) + 1);
+  }
+  const pendingWithdrawals = withdrawals.filter((item) => item.status === "pending" || item.status === "approved");
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const daily = new Map<string, { day: string; qualifiedVisits: number; withdrawalRequests: number; requestedCents: number; openCents: number; paidCents: number }>();
+  const ensureDay = (day: string) => {
+    if (!daily.has(day)) daily.set(day, { day, qualifiedVisits: 0, withdrawalRequests: 0, requestedCents: 0, openCents: 0, paidCents: 0 });
+    return daily.get(day)!;
+  };
+  for (let offset = -13; offset <= 0; offset++) {
+    const date = new Date(today.getTime() + offset * 86400000);
+    const day = date.toISOString().slice(0, 10);
+    ensureDay(day).qualifiedVisits = visitsByDay.get(day) ?? 0;
+  }
+  for (const item of withdrawals) {
+    const requestedDay = item.requested_at ? new Date(item.requested_at).toISOString().slice(0, 10) : "";
+    const amount = Number(item.amount_cents || 0);
+    if (daily.has(requestedDay)) {
+      const day = ensureDay(requestedDay);
+      day.withdrawalRequests++;
+      day.requestedCents += amount;
+      if (item.status === "pending" || item.status === "approved") day.openCents += amount;
+    }
+    if (item.status === "paid" && item.processed_at) {
+      const processedDay = new Date(item.processed_at).toISOString().slice(0, 10);
+      if (daily.has(processedDay)) ensureDay(processedDay).paidCents += amount;
+    }
+  }
+  return {
+    userCount: users.length,
+    linkCount: links.length,
+    qualifiedVisits: visits.length,
+    pendingPayoutCount: pendingWithdrawals.length,
+    pendingPayoutCents: pendingWithdrawals.reduce((sum, item) => sum + Number(item.amount_cents || 0), 0),
+    paidCents: withdrawals.filter((item) => item.status === "paid").reduce((sum, item) => sum + Number(item.amount_cents || 0), 0),
+    dailyActivity: [...daily.values()].sort((a, b) => a.day.localeCompare(b.day))
+  };
+}
+
 async function adminAction(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
-  if (user.role !== "admin" || user.phone !== ownerPhone) throw new Error("Acesso restrito ao administrador.");
+  if (user.role !== "admin" || !adminPhones.has(user.phone)) throw new Error("Acesso restrito ao administrador.");
   if (payload.action === "admin-list") {
-    const [{ data: users, error: usersError }, { data: withdrawals, error: withdrawalsError }, { data: links, error: linksError }] = await Promise.all([
-      supabase.from("kutt_users").select("id, phone, role, pix_key, created_at").order("created_at", { ascending: false }).limit(250),
-      supabase.from("kutt_withdrawals").select("id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users(phone)").order("requested_at", { ascending: false }).limit(250),
-      supabase.from("kutt_short_links").select("id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users(phone)").order("created_at", { ascending: false }).limit(250)
+    const [users, withdrawals, links, visits] = await Promise.all([
+      readAllRows("kutt_users", "id, phone, role, pix_key, created_at", "created_at"),
+      readAllRows("kutt_withdrawals", "id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users(phone)", "requested_at"),
+      readAllRows("kutt_short_links", "id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users(phone)", "created_at"),
+      readAllRows("kutt_reward_visits", "owner_user_id, visit_day", "visit_day")
     ]);
-    if (usersError) throw usersError; if (withdrawalsError) throw withdrawalsError; if (linksError) throw linksError;
-    return { users: users ?? [], withdrawals: withdrawals ?? [], links: links ?? [] };
+    return { users, withdrawals, links, summary: makeAdminSummary(users, withdrawals, links, visits) };
   }
   if (payload.action === "admin-withdrawal") {
     const status = payload.status;

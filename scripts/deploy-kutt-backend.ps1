@@ -25,6 +25,7 @@ if (-not $kutt['KUTT_SUPABASE_ACCESS_TOKEN']) {
 foreach ($name in @('DB_PASSWORD')) {
   if (-not $kutt[$name]) { throw "O .envkutt precisa conter $name." }
 }
+if (-not $kutt['ADMIN_PHONES']) { throw 'Configure ADMIN_PHONES no .envkutt com os telefones administradores em formato internacional, separados por vírgula.' }
 foreach ($name in @('GREEN_API_URL', 'GREEN_API_INSTANCE_ID', 'GREEN_API_TOKEN')) {
   if (-not $app[$name]) { throw "O .env local precisa conter $name para enviar os códigos de WhatsApp." }
 }
@@ -45,6 +46,7 @@ $secretLines = @(
   "GREEN_API_INSTANCE_ID=$($app['GREEN_API_INSTANCE_ID'])",
   "GREEN_API_TOKEN=$($app['GREEN_API_TOKEN'])",
   'OWNER_PHONE=5511989346164',
+  "ADMIN_PHONES=$($kutt['ADMIN_PHONES'])",
   "OTP_PEPPER=$($kutt['OTP_PEPPER'])",
   'PUBLIC_BASE_URL=https://kuttenc.github.io/urtador',
   'ALLOWED_ORIGINS=https://kuttenc.github.io'

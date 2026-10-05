@@ -44,6 +44,11 @@
     return value ? new Date(value).toLocaleDateString("pt-BR") : "—";
   }
 
+  function dateOnly(value) {
+    const [year, month, day] = String(value || "").split("-").map(Number);
+    return year && month && day ? new Date(year, month - 1, day).toLocaleDateString("pt-BR") : "—";
+  }
+
   function cell(row, value, tag = "td") {
     const node = document.createElement(tag);
     node.textContent = value ?? "—";
@@ -135,6 +140,21 @@
 
   async function refreshAdmin() {
     const data = await api("admin-list");
+    const summary = data.summary || {};
+    el("admin-user-count").textContent = Number(summary.userCount || 0).toLocaleString("pt-BR");
+    el("admin-link-count").textContent = Number(summary.linkCount || 0).toLocaleString("pt-BR");
+    el("admin-qualified-visits").textContent = Number(summary.qualifiedVisits || 0).toLocaleString("pt-BR");
+    el("admin-pending-pix").textContent = `${money(summary.pendingPayoutCents)} (${Number(summary.pendingPayoutCount || 0).toLocaleString("pt-BR")})`;
+    el("admin-paid-pix").textContent = money(summary.paidCents);
+    const dailyBody = el("admin-daily-body"); dailyBody.replaceChildren();
+    for (const item of summary.dailyActivity || []) {
+      const row = document.createElement("tr");
+      cell(row, dateOnly(item.day));
+      cell(row, Number(item.qualifiedVisits || 0).toLocaleString("pt-BR"));
+      cell(row, `${Number(item.withdrawalRequests || 0).toLocaleString("pt-BR")} · ${money(item.requestedCents)}`);
+      cell(row, money(item.openCents)); cell(row, money(item.paidCents));
+      dailyBody.append(row);
+    }
     const withdrawalsBody = el("admin-withdrawals-body"); withdrawalsBody.replaceChildren();
     for (const item of data.withdrawals || []) {
       const row = document.createElement("tr");
