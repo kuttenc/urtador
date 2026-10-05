@@ -1,0 +1,3 @@
+[functions.kutt-short-links]
+verify_jwt = false
+

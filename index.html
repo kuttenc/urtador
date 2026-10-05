@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Urtador</title>
+    <meta name="description" content="Encurtador de links simples para WhatsApp, anuncios e atendimentos.">
+    <link rel="stylesheet" href="assets/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand" aria-label="Urtador">
+          <span class="mark">U</span>
+          <span>Urtador</span>
+        </div>
+        <div class="status" data-status>Pronto para encurtar</div>
+      </header>
+
+      <section class="layout">
+        <div class="hero">
+          <h1>Links curtos para vender e atender sem perder a conversa.</h1>
+          <p>Crie um link pequeno para mandar no WhatsApp, colocar em anuncio, usar em checkout ou medir acessos de uma campanha.</p>
+
+          <form class="panel" data-shortener-form>
+            <div class="field">
+              <label for="url">Link grande</label>
+              <input id="url" name="url" type="url" placeholder="https://seusite.com.br/pagina" autocomplete="url" required>
+            </div>
+            <div class="field">
+              <label for="slug">Apelido <span>opcional</span></label>
+              <input id="slug" name="slug" type="text" placeholder="silva-cortes" maxlength="48" pattern="[A-Za-z0-9_-]+">
+            </div>
+            <div class="field">
+              <label for="title">Nome interno <span>opcional</span></label>
+              <input id="title" name="title" type="text" placeholder="Campanha do salao" maxlength="120">
+            </div>
+            <div class="actions">
+              <button class="button" type="submit">Encurtar link</button>
+              <button class="button secondary" type="button" data-copy>Copiar</button>
+            </div>
+            <p class="message" data-message></p>
+          </form>
+
+          <div class="result" data-result>
+            <a class="short-url" href="#" target="_blank" rel="noreferrer" data-result-link></a>
+          </div>
+        </div>
+
+        <aside class="stats" aria-label="Resumo do servico">
+          <h2>Controle rapido</h2>
+          <dl>
+            <div>
+              <dt>Hospedagem</dt>
+              <dd>GitHub Pages</dd>
+            </div>
+            <div>
+              <dt>Banco</dt>
+              <dd>Supabase</dd>
+            </div>
+            <div>
+              <dt>Seguranca</dt>
+              <dd>Funcao isolada</dd>
+            </div>
+            <div>
+              <dt>Uso</dt>
+              <dd>WhatsApp e anuncios</dd>
+            </div>
+          </dl>
+        </aside>
+      </section>
+    </main>
+
+    <script src="assets/config.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
+</html>
+
