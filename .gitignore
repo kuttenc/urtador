@@ -4,4 +4,7 @@
 node_modules/
 dist/
 .supabase/
+supabase/.temp/
+.envkutt
+.envkutt.*
 

@@ -69,3 +69,6 @@ as $$
       updated_at = now()
   where id = row_id;
 $$;
+
+revoke all on function public.kutt_increment_short_link_click(uuid) from public, anon, authenticated;
+grant execute on function public.kutt_increment_short_link_click(uuid) to service_role;

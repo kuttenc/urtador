@@ -1,0 +1,67 @@
+$ErrorActionPreference = 'Stop'
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$workspaceRoot = Split-Path -Parent $repoRoot
+$kuttEnvPath = Join-Path $workspaceRoot '.envkutt'
+$appEnvPath = Join-Path $workspaceRoot '.env'
+$projectRef = 'ggufcvrwctieacvbbwim'
+
+function Read-EnvFile([string]$path) {
+  if (-not (Test-Path -LiteralPath $path)) { throw "Arquivo de configuração local não encontrado: $path" }
+  $result = @{}
+  foreach ($line in Get-Content -LiteralPath $path) {
+    if ($line -match '^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$') {
+      $result[$matches[1]] = $matches[2].Trim().Trim('"').Trim("'")
+    }
+  }
+  return $result
+}
+
+$kutt = Read-EnvFile $kuttEnvPath
+$app = Read-EnvFile $appEnvPath
+if (-not $kutt['KUTT_SUPABASE_ACCESS_TOKEN']) {
+  throw 'Adicione KUTT_SUPABASE_ACCESS_TOKEN ao .envkutt usando um Access Token da conta Supabase que tem acesso ao projeto Kutt. Não envie esse token no chat.'
+}
+foreach ($name in @('DB_PASSWORD')) {
+  if (-not $kutt[$name]) { throw "O .envkutt precisa conter $name." }
+}
+foreach ($name in @('GREEN_API_URL', 'GREEN_API_INSTANCE_ID', 'GREEN_API_TOKEN')) {
+  if (-not $app[$name]) { throw "O .env local precisa conter $name para enviar os códigos de WhatsApp." }
+}
+
+if (-not $kutt['OTP_PEPPER']) {
+  $randomBytes = New-Object byte[] 32
+  [System.Security.Cryptography.RandomNumberGenerator]::Fill($randomBytes)
+  $pepper = ([System.BitConverter]::ToString($randomBytes) -replace '-', '').ToLowerInvariant()
+  Add-Content -LiteralPath $kuttEnvPath -Value "`nOTP_PEPPER=$pepper" -Encoding utf8
+  $kutt['OTP_PEPPER'] = $pepper
+}
+
+$env:SUPABASE_ACCESS_TOKEN = $kutt['KUTT_SUPABASE_ACCESS_TOKEN']
+$secretFile = Join-Path $repoRoot 'supabase\.temp\kutt-secrets.local.env'
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $secretFile) | Out-Null
+$secretLines = @(
+  "GREEN_API_URL=$($app['GREEN_API_URL'])",
+  "GREEN_API_INSTANCE_ID=$($app['GREEN_API_INSTANCE_ID'])",
+  "GREEN_API_TOKEN=$($app['GREEN_API_TOKEN'])",
+  'OWNER_PHONE=5511989346164',
+  "OTP_PEPPER=$($kutt['OTP_PEPPER'])",
+  'PUBLIC_BASE_URL=https://kuttenc.github.io/urtador',
+  'ALLOWED_ORIGINS=https://kuttenc.github.io'
+)
+[System.IO.File]::WriteAllLines($secretFile, $secretLines, [System.Text.UTF8Encoding]::new($false))
+
+try {
+  Push-Location $repoRoot
+  npx --yes supabase@latest link --project-ref $projectRef --password $kutt['DB_PASSWORD']
+  if ($LASTEXITCODE -ne 0) { throw 'Não foi possível vincular o projeto Supabase. Confira se o token tem acesso ao projeto.' }
+  npx --yes supabase@latest secrets set --env-file $secretFile --project-ref $projectRef
+  if ($LASTEXITCODE -ne 0) { throw 'Não foi possível configurar os secrets no Supabase.' }
+  npx --yes supabase@latest functions deploy kutt-short-links --project-ref $projectRef --no-verify-jwt
+  if ($LASTEXITCODE -ne 0) { throw 'A implantação da Edge Function falhou.' }
+  Write-Host 'Edge Function implantada. Teste o painel em https://kuttenc.github.io/urtador/.'
+}
+finally {
+  Pop-Location -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $secretFile -Force -ErrorAction SilentlyContinue
+}

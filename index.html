@@ -3,76 +3,114 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Urtador</title>
-    <meta name="description" content="Encurtador de links simples para WhatsApp, anuncios e atendimentos.">
+    <meta name="theme-color" content="#075b57">
+    <meta name="google-adsense-account" content="ca-pub-6464589391694014">
+    <meta name="description" content="Crie links curtos para compartilhar páginas de atendimento, cardápios, produtos e campanhas. Ferramenta simples em português para pequenos negócios.">
+    <meta name="robots" content="index,follow">
+    <link rel="canonical" href="https://kuttenc.github.io/urtador/">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    <meta property="og:title" content="Urtador — links curtos para o seu negócio">
+    <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
+    <title>Urtador — encurtador de links em português</title>
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6464589391694014" crossorigin="anonymous"></script>
     <link rel="stylesheet" href="assets/styles.css">
   </head>
   <body>
-    <main class="shell">
+    <div class="shell">
       <header class="topbar">
-        <div class="brand" aria-label="Urtador">
-          <span class="mark">U</span>
-          <span>Urtador</span>
-        </div>
-        <div class="status" data-status>Pronto para encurtar</div>
+        <a class="brand" href="./" aria-label="Urtador, página inicial"><span class="mark">U</span><span>Urtador</span></a>
+        <nav class="site-nav" aria-label="Navegação principal"><a href="#como-usar">Como usar</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Privacidade</a></nav>
       </header>
 
-      <section class="layout">
-        <div class="hero">
-          <h1>Links curtos para vender e atender sem perder a conversa.</h1>
-          <p>Crie um link pequeno para mandar no WhatsApp, colocar em anuncio, usar em checkout ou medir acessos de uma campanha.</p>
+      <main>
+        <section class="layout" aria-labelledby="main-title">
+          <div class="hero">
+            <p class="eyebrow">Urtador • links e divulgação</p>
+            <h1 id="main-title">Crie links curtos e acompanhe sua divulgação.</h1>
+            <p>Entre com seu WhatsApp. Você poderá criar links, acompanhar visitas qualificadas e solicitar seu saldo por Pix.</p>
+            <section id="auth-view" class="panel" aria-label="Acesso por WhatsApp">
+              <form id="phone-form">
+                <div class="field"><label for="phone">Seu celular com DDD</label><input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
+                <button class="button" type="submit">Receber código no WhatsApp</button>
+              </form>
+              <form id="otp-form" hidden>
+                <div class="field"><label for="otp">Código de 6 dígitos</label><input id="otp" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></div>
+                <button class="button" type="submit">Confirmar e entrar</button>
+                <button class="button secondary" type="button" id="change-phone">Trocar telefone</button>
+              </form>
+              <p class="message" id="auth-message" aria-live="polite"></p>
+              <small class="field-help">A sessão fica ativa por 3 horas neste navegador.</small>
+            </section>
 
-          <form class="panel" data-shortener-form>
-            <div class="field">
-              <label for="url">Link grande</label>
-              <input id="url" name="url" type="url" placeholder="https://seusite.com.br/pagina" autocomplete="url" required>
-            </div>
-            <div class="field">
-              <label for="slug">Apelido <span>opcional</span></label>
-              <input id="slug" name="slug" type="text" placeholder="silva-cortes" maxlength="48" pattern="[A-Za-z0-9_-]+">
-            </div>
-            <div class="field">
-              <label for="title">Nome interno <span>opcional</span></label>
-              <input id="title" name="title" type="text" placeholder="Campanha do salao" maxlength="120">
-            </div>
-            <div class="actions">
-              <button class="button" type="submit">Encurtar link</button>
-              <button class="button secondary" type="button" data-copy>Copiar</button>
-            </div>
-            <p class="message" data-message></p>
-          </form>
+            <section id="dashboard-view" hidden>
+              <div class="dashboard-head"><div><p class="eyebrow">Painel</p><h2 id="welcome-title">Bem-vindo</h2><p id="session-expiry" class="field-help"></p></div><button id="logout-button" class="button secondary" type="button">Sair</button></div>
+              <div class="balance-grid">
+                <article class="balance-card"><span>Visitas válidas</span><strong id="eligible-count">0</strong></article>
+                <article class="balance-card"><span>Saldo acumulado</span><strong id="earned-balance">R$ 0,00</strong></article>
+                <article class="balance-card"><span>Disponível para solicitar</span><strong id="available-balance">R$ 0,00</strong></article>
+              </div>
 
-          <div class="result" data-result>
-            <a class="short-url" href="#" target="_blank" rel="noreferrer" data-result-link></a>
+              <form class="panel dashboard-panel" id="shortener-form">
+                <h3>Criar link curto</h3>
+                <div class="field"><label for="url">Cole o endereço que quer divulgar</label><input id="url" name="url" type="url" placeholder="https://seusite.com.br/pagina" autocomplete="url" required></div>
+                <div class="field"><label for="slug">Final personalizado <span>opcional</span></label><input id="slug" name="slug" type="text" placeholder="minha-oferta" maxlength="48" pattern="[A-Za-z0-9_-]+"></div>
+                <div class="field"><label for="title">Nome para identificar <span>opcional</span></label><input id="title" name="title" type="text" placeholder="Campanha de outubro" maxlength="120"></div>
+                <div class="actions"><button class="button" type="submit">Encurtar link</button><button class="button secondary" type="button" id="copy-link" disabled>Copiar</button></div>
+                <p class="message" id="link-message" aria-live="polite"></p>
+                <a id="short-link-result" class="short-url" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
+              </form>
+
+              <section class="panel dashboard-panel">
+                <h3>Seus links</h3><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Link</th><th>Visitas</th><th>Criado</th></tr></thead><tbody id="links-body"></tbody></table></div>
+              </section>
+
+              <section class="panel dashboard-panel">
+                <h3>Receber por Pix</h3><p class="field-help">Cadastre sua chave. Quando atingir o mínimo disponível, envie a solicitação; o administrador confere e paga manualmente.</p>
+                <form id="pix-form"><div class="field"><label for="pix-key">Sua chave Pix</label><input id="pix-key" name="pixKey" maxlength="120" autocomplete="off" placeholder="CPF, celular, e-mail ou chave aleatória" required></div><button class="button secondary" type="submit">Salvar chave Pix</button></form>
+                <button class="button" type="button" id="withdraw-button">Solicitar saque</button><p class="message" id="payout-message" aria-live="polite"></p>
+                <div class="table-wrap"><table><thead><tr><th>Solicitado</th><th>Valor</th><th>Status</th></tr></thead><tbody id="withdrawals-body"></tbody></table></div>
+              </section>
+
+              <section id="admin-panel" class="panel dashboard-panel" hidden>
+                <div class="dashboard-head"><div><p class="eyebrow">Administração</p><h3>Painel do proprietário</h3></div><button id="refresh-admin" class="button secondary" type="button">Atualizar</button></div>
+                <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
+                <h4>Usuários</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Perfil</th><th>Chave Pix</th><th>Cadastro</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
+                <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Visitas totais</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
+              </section>
+              <p class="notice">Os R$ 70 são saldo pendente por cada grupo de mil visitas qualificadas únicas. O administrador confere as solicitações e realiza os pagamentos via Pix manualmente. Visitas automatizadas são excluídas; a contagem não garante monetização por anúncios.</p>
+            </section>
           </div>
-        </div>
 
-        <aside class="stats" aria-label="Resumo do servico">
-          <h2>Controle rapido</h2>
-          <dl>
-            <div>
-              <dt>Hospedagem</dt>
-              <dd>GitHub Pages</dd>
-            </div>
-            <div>
-              <dt>Banco</dt>
-              <dd>Supabase</dd>
-            </div>
-            <div>
-              <dt>Seguranca</dt>
-              <dd>Funcao isolada</dd>
-            </div>
-            <div>
-              <dt>Uso</dt>
-              <dd>WhatsApp e anuncios</dd>
-            </div>
-          </dl>
-        </aside>
-      </section>
-    </main>
+          <aside class="stats" aria-label="Como funciona">
+            <h2>Simples para começar</h2>
+            <dl><div><dt>Acesso</dt><dd>WhatsApp</dd></div><div><dt>Sessão</dt><dd>3 horas</dd></div><div><dt>Links</dt><dd>Seu painel</dd></div><div><dt>Pagamento</dt><dd>Pix manual</dd></div></dl>
+            <p class="notice">Compartilhe somente links confiáveis. Confirme o endereço de destino antes de divulgar.</p>
+          </aside>
+        </section>
 
+        <section id="como-usar" class="content-section" aria-labelledby="how-title">
+          <p class="eyebrow">Passo a passo</p><h2 id="how-title">Como criar e usar seu link</h2>
+          <div class="steps"><article><span class="step-number">1</span><h3>Cole o endereço</h3><p>Insira a página que deseja compartilhar. O endereço precisa começar com http:// ou https://.</p></article><article><span class="step-number">2</span><h3>Personalize se quiser</h3><p>Escolha um final fácil de reconhecer, como o nome de um produto, serviço ou campanha.</p></article><article><span class="step-number">3</span><h3>Copie e compartilhe</h3><p>Use o botão de cópia e envie o novo link em uma conversa, publicação ou material de divulgação.</p></article></div>
+        </section>
+
+        <section class="content-section two-columns" aria-labelledby="use-title">
+          <div><p class="eyebrow">Usos do dia a dia</p><h2 id="use-title">Um endereço curto, vários lugares para usar</h2><p>Compartilhe a página de um cardápio, um catálogo, um formulário de atendimento, uma oferta ou uma página de agendamento. O link continua levando ao endereço de destino que você informou.</p></div>
+          <div class="info-card"><h3>Antes de divulgar</h3><ul><li>Abra o endereço original e confira se está correto.</li><li>Não encurte links que contenham senhas ou dados pessoais.</li><li>Envie o link para si mesmo primeiro e teste a abertura.</li></ul></div>
+        </section>
+
+        <section class="content-section faq" aria-labelledby="faq-title">
+          <p class="eyebrow">Dúvidas comuns</p><h2 id="faq-title">Perguntas frequentes</h2>
+          <details><summary>O Urtador muda o conteúdo da página?</summary><p>Não. O link curto encaminha para o endereço que você colou. Confira o destino antes de compartilhar.</p></details>
+          <details><summary>Posso escolher o final do link?</summary><p>Sim. O final personalizado é opcional e só pode usar letras, números, hífen e sublinhado. Se já estiver em uso, escolha outro.</p></details>
+          <details><summary>O contador de acessos é uma auditoria?</summary><p>Não. A contagem é indicativa e pode incluir acessos automáticos de verificadores e robôs. Não use como comprovante financeiro ou prova de entrega.</p></details>
+          <details><summary>O Urtador controla o site de destino?</summary><p>Não. Páginas externas têm seus próprios responsáveis, regras e políticas de privacidade.</p></details>
+        </section>
+      </main>
+
+      <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
+    </div>
     <script src="assets/config.js"></script>
     <script src="assets/app.js"></script>
   </body>
 </html>
-

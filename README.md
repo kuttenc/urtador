@@ -15,21 +15,31 @@ Nenhuma senha de banco fica no GitHub ou no navegador.
 
 ## Deploy do Supabase
 
-Configure os secrets da funcao antes do deploy:
+Configure estes secrets em **Supabase → Edge Functions → Secrets** antes de publicar. O `SUPABASE_SERVICE_ROLE_KEY` é fornecido pelo runtime; não coloque essa chave no navegador ou no repositório.
+
+| Secret | Uso |
+| --- | --- |
+| `GREEN_API_URL` | URL da conta Green API usada para enviar os códigos |
+| `GREEN_API_INSTANCE_ID` | Instância autorizada do WhatsApp |
+| `GREEN_API_TOKEN` | Token da instância, guardado só no servidor |
+| `OWNER_PHONE` | Telefone administrador em formato internacional, por exemplo `5511989346164` |
+| `OTP_PEPPER` | Segredo aleatório longo para proteger hashes dos códigos |
+| `PUBLIC_BASE_URL` | `https://kuttenc.github.io/urtador` |
+| `ALLOWED_ORIGINS` | `https://kuttenc.github.io` |
+
+Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto correto, publique a função com verificação JWT desativada na camada do gateway. A própria função faz a autenticação por sessão após o OTP:
 
 ```powershell
-supabase secrets set SUPABASE_URL="https://SEU-PROJETO.supabase.co"
-supabase secrets set SUPABASE_SERVICE_ROLE_KEY="SUA_SERVICE_ROLE_KEY"
-supabase secrets set PUBLIC_BASE_URL="https://kuttenc.github.io/urtador"
-supabase secrets set ALLOWED_ORIGINS="https://kuttenc.github.io,http://localhost:4173,http://127.0.0.1:4173"
+npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
-Depois aplique a migracao e publique a funcao:
+As migrações SQL `202610050001` e `202610050002` criam as tabelas e políticas necessárias. A segunda migração também foi aplicada diretamente ao banco de produção; ela é aditiva e pode ser repetida pelo CLI para sincronizar o histórico de migrações.
 
-```powershell
-supabase db push
-supabase functions deploy kutt-short-links --no-verify-jwt
-```
+## Acesso e pagamentos
+
+O login envia um código de seis dígitos pelo WhatsApp e cria uma sessão de três horas. O telefone `OWNER_PHONE` é o único administrador; usuários comuns só veem os próprios links, cadastram a própria chave Pix e solicitam saque. O administrador confere a solicitação, aprova, faz o Pix por fora e marca como pago no painel.
+
+O painel calcula R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Essa regra deve ser mantida separada de impressões/cliques do Google AdSense; a página de redirecionamento não carrega código AdSense.
 
 ## Teste local
 

@@ -31,6 +31,8 @@ input {
   font: inherit;
 }
 
+[hidden] { display: none !important; }
+
 .shell {
   width: min(1040px, calc(100% - 32px));
   margin: 0 auto;
@@ -51,6 +53,34 @@ input {
   gap: 12px;
   font-weight: 800;
   letter-spacing: 0;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-nav,
+.site-footer nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.site-nav a,
+.site-footer a,
+.text-link {
+  color: var(--brand-strong);
+  font-weight: 700;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.eyebrow {
+  margin: 0 0 8px !important;
+  color: var(--brand-strong) !important;
+  font-size: 13px !important;
+  font-weight: 800;
+  letter-spacing: .12em;
+  text-transform: uppercase;
 }
 
 .mark {
@@ -120,6 +150,8 @@ input {
   color: var(--muted);
   font-weight: 500;
 }
+
+.field-help { color: var(--muted); font-size: 13px; }
 
 .field input {
   width: 100%;
@@ -206,6 +238,69 @@ input {
   color: var(--danger);
 }
 
+.notice {
+  margin: 18px 0 0;
+  padding: 13px 14px;
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--soft);
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.dashboard-head { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; }
+.dashboard-head h2,.dashboard-head h3 { margin:0; }
+.balance-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin:16px 0; }
+.balance-card { display:grid; gap:8px; padding:16px; border:1px solid var(--line); border-radius:10px; background:#fff; }
+.balance-card span { color:var(--muted); font-size:13px; }
+.balance-card strong { font-size:clamp(18px,3vw,25px); }
+.dashboard-panel { margin-top:16px; }
+.dashboard-panel h3 { margin:0 0 12px; }
+.dashboard-panel h4 { margin:22px 0 10px; }
+.table-wrap { width:100%; overflow-x:auto; margin:12px 0; }
+table { width:100%; border-collapse:collapse; font-size:14px; }
+th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+td a { color:var(--brand-strong); overflow-wrap:anywhere; }
+.button.small { min-height:34px; padding:0 10px; margin:2px; font-size:12px; }
+#short-link-result { display:block; margin-top:14px; }
+
+.result p { margin: 0 0 8px; color: var(--muted); }
+
+.content-section {
+  margin: 64px 0;
+  padding: 30px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255,255,255,.82);
+  box-shadow: 0 16px 42px rgba(23, 32, 51, 0.05);
+}
+
+.content-section h2 { margin: 0 0 16px; font-size: clamp(26px, 3vw, 38px); line-height: 1.15; }
+.content-section h3 { margin: 12px 0 8px; font-size: 19px; }
+.content-section p,
+.content-section li { color: var(--muted); line-height: 1.7; }
+.steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.steps article,
+.info-card { padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.steps article p { margin-bottom: 0; }
+.step-number { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--brand); color: #fff; font-weight: 900; }
+.two-columns { display: grid; grid-template-columns: 1.2fr .8fr; gap: 28px; align-items: center; }
+.info-card ul { padding-left: 20px; }
+.faq details { padding: 16px 0; border-top: 1px solid var(--line); }
+.faq summary { cursor: pointer; color: var(--ink); font-weight: 800; }
+.faq details p { margin-bottom: 0; }
+.site-footer { padding: 12px 4px 40px; color: var(--muted); text-align: center; }
+.site-footer nav { justify-content: center; margin: 16px 0; }
+.site-footer p { line-height: 1.6; }
+.footer-note { font-size: 13px; }
+.legal-page { width: min(820px, 100%); margin: 0 auto; }
+.legal-page h1 { margin: 0 0 14px; font-size: clamp(32px, 5vw, 48px); }
+.legal-page h2 { margin-top: 30px; font-size: 22px; }
+.legal-page p,.legal-page li { color: var(--muted); line-height: 1.75; }
+.legal-page .updated { font-size: 14px; }
+
 .stats {
   padding: 20px;
 }
@@ -271,12 +366,25 @@ input {
     display: grid;
   }
 
+  .site-nav { gap: 12px; }
+
   .layout {
     grid-template-columns: 1fr;
   }
 
+  .steps,
+  .two-columns { grid-template-columns: 1fr; }
+
+  .balance-grid { grid-template-columns:1fr; }
+  .dashboard-head { align-items:flex-start; }
+
+  .content-section { margin: 40px 0; padding: 22px; }
+
   .hero h1 {
     font-size: 40px;
   }
+
+  .site-nav,
+  .site-footer nav { gap: 10px 15px; }
 }
 
