@@ -46,6 +46,13 @@
                 <button class="button" type="submit">Salvar senha</button>
               </form>
               <p class="message" id="auth-message" aria-live="polite"></p>
+              <form id="prelogin-link-form" class="prelogin-link-form">
+                <h3>Já tem o endereço que quer encurtar?</h3>
+                <p class="field-help">Cole primeiro. Vamos guardar o endereço neste navegador enquanto você entra ou confirma seu WhatsApp.</p>
+                <div class="field"><label for="pending-url">Endereço do link</label><input id="pending-url" name="url" type="url" inputmode="url" placeholder="https://exemplo.com/pagina" autocomplete="url" required></div>
+                <button class="button secondary" type="submit">Guardar e continuar</button>
+                <p class="message" id="draft-message" aria-live="polite"></p>
+              </form>
               <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação do WhatsApp; depois, pediremos senha e código novamente.</small>
             </section>
 

@@ -1,7 +1,15 @@
 (function () {
   const config = window.URTADOR_CONFIG || {};
   const apiBase = `${String(config.supabaseUrl || "").replace(/\/$/, "")}/functions/v1/${config.functionName || "kutt-short-links"}`;
-  const state = { token: sessionStorage.getItem("urtador-token") || "", phone: sessionStorage.getItem("urtador-phone") || "", user: null, data: null };
+  const storage = window.localStorage || window.sessionStorage;
+  const state = {
+    token: storage.getItem("urtador-token") || "",
+    phone: storage.getItem("urtador-phone") || "",
+    passwordSetupRequired: storage.getItem("urtador-password-setup") === "1",
+    resumingDraft: false,
+    user: null,
+    data: null
+  };
   const el = (id) => document.getElementById(id);
 
   function say(node, text, error = false) {
@@ -94,6 +102,27 @@
     }
     el("admin-panel").hidden = data.user.role !== "admin";
     if (data.user.role === "admin") await refreshAdmin();
+    resumePendingLink();
+  }
+
+  function resumePendingLink() {
+    const raw = storage.getItem("urtador-pending-link");
+    if (!raw || state.resumingDraft) return;
+    try {
+      const draft = JSON.parse(raw);
+      if (!draft.url || typeof draft.url !== "string" || Date.now() - Number(draft.savedAt || 0) > 7 * 24 * 60 * 60 * 1000) {
+        storage.removeItem("urtador-pending-link");
+        return;
+      }
+      el("url").value = draft.url;
+      el("slug").value = draft.slug || "";
+      el("title").value = draft.title || "";
+      state.resumingDraft = true;
+      say(el("link-message"), "Retomando o link que você guardou…");
+      el("shortener-form").requestSubmit();
+    } catch {
+      storage.removeItem("urtador-pending-link");
+    }
   }
 
   async function refreshAdmin() {
@@ -136,7 +165,7 @@
     event.preventDefault();
     const phone = el("login-phone").value.trim();
     const password = el("login-password").value;
-    state.phone = phone; sessionStorage.setItem("urtador-phone", phone);
+    state.phone = phone; storage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Conferindo seus dados…");
     try {
       const result = await api("login-password", { phone, password });
@@ -146,7 +175,9 @@
         return;
       }
       state.token = result.token; state.user = result.user;
-      sessionStorage.setItem("urtador-token", result.token);
+      state.passwordSetupRequired = false;
+      storage.setItem("urtador-token", result.token);
+      storage.removeItem("urtador-password-setup");
       await refreshDashboard();
       say(el("auth-message"), "Acesso confirmado.");
     } catch (error) { say(el("auth-message"), error.message, true); }
@@ -156,7 +187,7 @@
     const phoneInput = el("login-phone");
     if (!phoneInput.reportValidity()) return;
     const phone = phoneInput.value.trim();
-    state.phone = phone; sessionStorage.setItem("urtador-phone", phone);
+    state.phone = phone; storage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Enviando código…");
     try {
       await api("request-otp", { phone });
@@ -171,13 +202,17 @@
     try {
       const result = await api("verify-otp", { phone: state.phone, code: el("otp").value });
       state.token = result.token; state.user = result.user;
-      sessionStorage.setItem("urtador-token", result.token);
+      storage.setItem("urtador-token", result.token);
       if (result.passwordSetupRequired) {
+        state.passwordSetupRequired = true;
+        storage.setItem("urtador-password-setup", "1");
         showAuth("set-password");
         say(el("auth-message"), "WhatsApp confirmado. Crie sua senha abaixo para concluir o primeiro acesso.");
         el("new-password").focus();
         return;
       }
+      state.passwordSetupRequired = false;
+      storage.removeItem("urtador-password-setup");
       await refreshDashboard();
       say(el("auth-message"), "Acesso confirmado.");
     } catch (error) { say(el("auth-message"), error.message, true); }
@@ -199,6 +234,8 @@
     say(el("auth-message"), "Salvando sua senha…");
     try {
       const result = await api("set-password", { password });
+      state.passwordSetupRequired = false;
+      storage.removeItem("urtador-password-setup");
       await refreshDashboard();
       say(el("auth-message"), result.message);
     } catch (error) { say(el("auth-message"), error.message, true); }
@@ -207,20 +244,26 @@
   el("change-phone")?.addEventListener("click", () => { showAuth("password"); el("otp").value = ""; el("login-password").value = ""; say(el("auth-message"), ""); });
   el("logout-button")?.addEventListener("click", async () => {
     try { await api("logout"); } catch { /* The local session is still discarded if the network is unavailable. */ }
-    state.token = ""; sessionStorage.removeItem("urtador-token"); sessionStorage.removeItem("urtador-phone");
+    state.token = ""; state.passwordSetupRequired = false; storage.removeItem("urtador-token"); storage.removeItem("urtador-phone"); storage.removeItem("urtador-password-setup");
     setLoggedIn(false); showAuth("password"); el("login-password").value = ""; say(el("auth-message"), "Você saiu da sua conta.");
   });
 
   el("shortener-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
+    const resumedDraft = state.resumingDraft;
+    state.resumingDraft = false;
     const button = event.currentTarget.querySelector("button[type='submit']");
     button.disabled = true; say(el("link-message"), "Criando seu link…"); el("short-link-result").hidden = true;
     try {
       const result = await api("create", { url: el("url").value, slug: el("slug").value, title: el("title").value });
+      storage.removeItem("urtador-pending-link");
       const anchor = el("short-link-result"); anchor.href = result.shortUrl; anchor.textContent = result.shortUrl; anchor.hidden = false;
       el("copy-link").disabled = false; say(el("link-message"), "Link criado. Copie e compartilhe.");
       await refreshDashboard();
-    } catch (error) { say(el("link-message"), error.message, true); }
+    } catch (error) {
+      if (resumedDraft) storage.setItem("urtador-pending-link", JSON.stringify({url: el("url").value, slug: el("slug").value, title: el("title").value, savedAt: Date.now()}));
+      say(el("link-message"), error.message, true);
+    }
     finally { button.disabled = false; }
   });
 
@@ -243,9 +286,25 @@
 
   el("refresh-admin")?.addEventListener("click", () => refreshAdmin().catch((error) => window.alert(error.message)));
 
-  if (state.token) {
+  el("prelogin-link-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const url = el("pending-url").value.trim();
+    storage.setItem("urtador-pending-link", JSON.stringify({url, savedAt: Date.now()}));
+    say(el("draft-message"), "Endereço guardado. Entre com sua senha ou escolha receber o código; depois do acesso, vamos retomar este link.");
+    el("login-phone").focus();
+  });
+
+  const pendingDraft = storage.getItem("urtador-pending-link");
+  if (pendingDraft) {
+    try { el("pending-url").value = JSON.parse(pendingDraft).url || ""; } catch { storage.removeItem("urtador-pending-link"); }
+  }
+  if (state.phone) el("login-phone").value = state.phone;
+  if (state.token && state.passwordSetupRequired) {
+    showAuth("set-password");
+    say(el("auth-message"), "Seu WhatsApp já foi confirmado. Crie sua senha para concluir o primeiro acesso.");
+  } else if (state.token) {
     refreshDashboard().catch((error) => {
-      state.token = ""; sessionStorage.removeItem("urtador-token"); setLoggedIn(false); showAuth("password");
+      state.token = ""; storage.removeItem("urtador-token"); setLoggedIn(false); showAuth("password");
       say(el("auth-message"), error.message, true);
     });
   } else showAuth("password");

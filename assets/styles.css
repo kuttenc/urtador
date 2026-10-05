@@ -153,6 +153,23 @@ input {
 
 .field-help { color: var(--muted); font-size: 13px; }
 
+.prelogin-link-form {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.prelogin-link-form h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.prelogin-link-form > .field-help {
+  display: block;
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+
 .field input {
   width: 100%;
   min-height: 48px;
