@@ -72,6 +72,14 @@
     el("set-password-form").hidden = mode !== "set-password";
   }
 
+  function showExistingCodeIfRateLimited(error) {
+    if (!/limite de c[oó]digos/i.test(String(error?.message || ""))) return false;
+    showAuth("otp");
+    say(el("auth-message"), `${error.message} Se você já recebeu um código nos últimos 10 minutos, digite o mais recente; se não, aguarde antes de pedir outro.`, true);
+    el("otp").focus();
+    return true;
+  }
+
   async function refreshDashboard() {
     const data = await api("me");
     state.data = data;
@@ -180,7 +188,7 @@
       storage.removeItem("urtador-password-setup");
       await refreshDashboard();
       say(el("auth-message"), "Acesso confirmado.");
-    } catch (error) { say(el("auth-message"), error.message, true); }
+    } catch (error) { if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), error.message, true); }
   });
 
   el("first-access-button")?.addEventListener("click", async () => {
@@ -193,7 +201,7 @@
       await api("request-otp", { phone });
       showAuth("otp");
       say(el("auth-message"), "Código enviado pelo WhatsApp. Digite os 6 números recebidos.");
-    } catch (error) { say(el("auth-message"), error.message, true); }
+    } catch (error) { if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), error.message, true); }
   });
 
   el("otp-form")?.addEventListener("submit", async (event) => {
