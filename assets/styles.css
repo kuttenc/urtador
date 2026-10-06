@@ -503,8 +503,7 @@ th { color: #91a8c6; }
 }
 
 .redirect-promo a,
-.redirect-destination a { color: #55e9b0; font-weight: 800; }
-.redirect-destination { overflow-wrap: anywhere; color: #b7c6d8; font-size: .85rem; }
+.redirect-promo a { color: #55e9b0; font-weight: 800; }
 .redirect-continue {
   display: inline-flex;
   margin-top: 12px;

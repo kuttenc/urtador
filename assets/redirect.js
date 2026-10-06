@@ -3,8 +3,6 @@
   const apiBase = `${String(config.supabaseUrl || "").replace(/\/$/, "")}/functions/v1/${config.functionName || "kutt-short-links"}`;
   const basePath = config.basePath || "/urtador/";
   const status = document.querySelector("[data-redirect-status]");
-  const destinationBox = document.querySelector("[data-redirect-destination]");
-  const destinationLink = document.querySelector("[data-destination-link]");
   const continueLink = document.querySelector("[data-redirect-continue]");
   const path = window.location.pathname;
   const index = path.indexOf(basePath);
@@ -28,11 +26,6 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.url) throw new Error(data.error || "Link nao encontrado.");
-    if (destinationLink && destinationBox) {
-      destinationLink.href = data.url;
-      destinationLink.textContent = data.url;
-      destinationBox.hidden = false;
-    }
     if (continueLink) {
       continueLink.href = data.url;
       continueLink.hidden = false;
