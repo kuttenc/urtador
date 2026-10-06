@@ -502,8 +502,9 @@ th { color: #91a8c6; }
   font-size: .95rem;
 }
 
-.redirect-promo a,
 .redirect-promo a { color: #55e9b0; font-weight: 800; }
+.redirect-countdown { margin: 12px 0; color: #55e9b0; font-size: 1.1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.redirect-countdown[hidden] { display: none; }
 .redirect-continue {
   display: inline-flex;
   margin-top: 12px;
@@ -512,7 +513,6 @@ th { color: #91a8c6; }
   border-radius: 9px;
   background: #087d5e;
   color: #fff;
-  font-weight: 800;
   text-decoration: none;
   font: inherit;
   font-weight: 800;
