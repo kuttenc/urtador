@@ -402,8 +402,8 @@ async function adminAction(request: Request, payload: Payload) {
   if (payload.action === "admin-list") {
     const [users, withdrawals, links, visits] = await Promise.all([
       readAllRows("kutt_users", "id, phone, role, pix_key, created_at", "created_at"),
-      readAllRows("kutt_withdrawals", "id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users(phone)", "requested_at"),
-      readAllRows("kutt_short_links", "id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users(phone)", "created_at"),
+      readAllRows("kutt_withdrawals", "id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at"),
+      readAllRows("kutt_short_links", "id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users!kutt_short_links_owner_user_id_fkey(phone)", "created_at"),
       readAllRows("kutt_reward_visits", "owner_user_id, visit_day", "visit_day")
     ]);
     return { users, withdrawals, links, summary: makeAdminSummary(users, withdrawals, links, visits) };
