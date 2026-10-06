@@ -30,17 +30,7 @@
       continueLink.href = data.url;
       continueLink.hidden = false;
     }
-    let secondsLeft = 20;
-    write(`Redirecionando em ${secondsLeft} segundos. Ou continue agora.`);
-    const countdown = window.setInterval(() => {
-      secondsLeft -= 1;
-      if (secondsLeft <= 0) {
-        window.clearInterval(countdown);
-        window.location.replace(data.url);
-        return;
-      }
-      write(`Redirecionando em ${secondsLeft} segundos. Ou continue agora.`);
-    }, 1000);
+    write("Link pronto. Toque no botão para continuar.");
   } catch (error) {
     write(error.message || "Link nao encontrado.");
   }
