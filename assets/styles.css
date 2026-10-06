@@ -508,14 +508,19 @@ th { color: #91a8c6; }
   display: inline-flex;
   margin-top: 12px;
   padding: 11px 16px;
+  border: 0;
   border-radius: 9px;
   background: #087d5e;
   color: #fff;
   font-weight: 800;
   text-decoration: none;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
 }
 .redirect-continue[hidden] { display: none; }
 .redirect-continue:hover { background: #09936f; }
+.redirect-continue:disabled { opacity: .62; cursor: wait; }
 
 body.dashboard-mode .layout { grid-template-columns: minmax(0, 1fr); }
 body.dashboard-mode .login-art { display: none; }
