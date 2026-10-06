@@ -3,6 +3,9 @@
   const apiBase = `${String(config.supabaseUrl || "").replace(/\/$/, "")}/functions/v1/${config.functionName || "kutt-short-links"}`;
   const basePath = config.basePath || "/urtador/";
   const status = document.querySelector("[data-redirect-status]");
+  const destinationBox = document.querySelector("[data-redirect-destination]");
+  const destinationLink = document.querySelector("[data-destination-link]");
+  const continueLink = document.querySelector("[data-redirect-continue]");
   const path = window.location.pathname;
   const index = path.indexOf(basePath);
   const slug = decodeURIComponent((index >= 0 ? path.slice(index + basePath.length) : path.slice(1)).replace(/^\/+|\/+$/g, ""));
@@ -25,8 +28,26 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.url) throw new Error(data.error || "Link nao encontrado.");
-    write("Abrindo destino...");
-    window.location.replace(data.url);
+    if (destinationLink && destinationBox) {
+      destinationLink.href = data.url;
+      destinationLink.textContent = data.url;
+      destinationBox.hidden = false;
+    }
+    if (continueLink) {
+      continueLink.href = data.url;
+      continueLink.hidden = false;
+    }
+    let secondsLeft = 20;
+    write(`Redirecionando em ${secondsLeft} segundos. Ou continue agora.`);
+    const countdown = window.setInterval(() => {
+      secondsLeft -= 1;
+      if (secondsLeft <= 0) {
+        window.clearInterval(countdown);
+        window.location.replace(data.url);
+        return;
+      }
+      write(`Redirecionando em ${secondsLeft} segundos. Ou continue agora.`);
+    }, 1000);
   } catch (error) {
     write(error.message || "Link nao encontrado.");
   }
