@@ -35,7 +35,7 @@ Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto 
 npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
-As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001`–`202610070004` adicionam configuração de anúncios, taxas individuais de repasse e recuperação segura de senha; aplique-as antes de publicar a Edge Function atualizada.
+As migrações SQL criam as tabelas e políticas necessárias. A migração `202610070007_kutt_atomic_qualified_clicks.sql` mantém o contador confiável e grava clique, saldo e deduplicação numa transação única; aplique-a antes de publicar a Edge Function atualizada.
 
 Links podem ser criados sem cadastro. Um identificador aleatório do navegador é guardado localmente; depois do login no mesmo navegador, a função anexa os links anônimos à conta. O backend guarda somente o hash desse identificador e o hash do IP de criação (para prevenção de abuso); não usa o IP para identificar a conta. A migração `202610070006_guest_link_sessions.sql` adiciona o campo necessário.
 
@@ -43,7 +43,7 @@ Links podem ser criados sem cadastro. Um identificador aleatório do navegador �
 
 No primeiro acesso, um código de seis dígitos enviado pelo WhatsApp confirma o telefone e libera o cadastro de senha. A senha é armazenada como hash PBKDF2-SHA-256 com salt aleatório, nunca em texto aberto. Nos 48 horas após cada verificação do WhatsApp, a senha permite iniciar uma nova sessão; após esse prazo, a senha continua obrigatória e o sistema envia um novo código ao WhatsApp. Cada sessão expira em três horas. Os telefones em `OWNER_PHONE` e `ADMIN_PHONES` definem os administradores; esses números ficam nos secrets do Supabase, não no repositório público. Usuários comuns só veem os próprios links, cadastram a própria chave Pix e solicitam saque. O administrador confere a solicitação, aprova, faz o Pix por fora e marca como pago no painel.
 
-O valor-base é R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Administradores podem ajustar de 0% a 100% do valor-base para cada conta. A nova taxa é registrada em cada nova visita elegível; visitas anteriores mantêm a taxa que tinham. Isso não é o CPM real nem a receita de anúncios do Google AdSense.
+O valor-base é R$ 70 por mil aberturas qualificadas. Conta somente quando a pessoa toca em “Abrir destino”; visualização de página/anúncio não conta. Cada visitante por IP gera no máximo um repasse por colaborador por dia, mesmo que abra vários links dele. Robôs, IP de criação e repetições no mesmo dia não geram repasse. A gravação do clique, contador e saldo é atômica no Supabase para evitar duplicidade ou saldo parcial. Administradores podem ajustar de 0% a 100% do valor-base para cada conta; a taxa vigente fica gravada em cada novo registro. Saques seguem conferência manual. Isso não é o CPM real nem a receita de anúncios do Google AdSense.
 
 O painel administrativo também gera relatórios por período e agrupamento diário, semanal ou mensal. Mostra a estimativa interna de repasse pelas visitas registradas, os Pix que administradores marcaram como pagos e os pedidos ainda em aberto, com exportação CSV. A previsão de reserva para 7 e 30 dias projeta a média dos últimos sete dias completos e soma o saldo de repasses estimado ainda não marcado como pago. Esses números não são receita confirmada dos fornecedores de anúncios nem uma garantia de quando alguém solicitará saque.
 

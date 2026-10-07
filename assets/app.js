@@ -206,7 +206,7 @@
       const row = document.createElement("tr");
       cell(row, link.title || link.slug);
       const linkCell = document.createElement("td"); linkCell.append(safeLink(`${config.defaultDomain}/${link.slug}`, `${config.defaultDomain}/${link.slug}`)); row.append(linkCell);
-      cell(row, Number(link.click_count || 0).toLocaleString("pt-BR"));
+      cell(row, Number(link.qualified_click_count || 0).toLocaleString("pt-BR"));
       cell(row, date(link.created_at));
       linksBody.append(row);
     }
@@ -333,7 +333,7 @@
       cell(row, user?.phone || "legado");
       const shortCell = document.createElement("td"); shortCell.append(safeLink(`${config.defaultDomain}/${item.slug}`, item.slug)); row.append(shortCell);
       const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
-      cell(row, Number(item.click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
+      cell(row, Number(item.qualified_click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
     }
     el("reward-base-value").value = (Number(adConfiguration.rewardBaseCents ?? 7000) / 100).toFixed(2);
     el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);

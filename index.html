@@ -111,7 +111,7 @@
                       <p class="message" id="link-message" aria-live="polite"></p>
                       <a id="short-link-result" class="short-url" href="#" target="_blank" rel="noopener noreferrer" hidden></a>
                     </form>
-                    <section class="panel dashboard-panel"><h3>Seus links</h3><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Link</th><th>Visitas</th><th>Criado</th></tr></thead><tbody id="links-body"></tbody></table></div></section>
+                    <section class="panel dashboard-panel"><h3>Seus links</h3><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Link</th><th>Cliques únicos</th><th>Criado</th></tr></thead><tbody id="links-body"></tbody></table></div></section>
                   </section>
 
                   <section class="workspace-page" data-dashboard-area="earnings" hidden>
@@ -120,7 +120,7 @@
                       <article class="balance-card"><span>Saldo registrado</span><strong id="earnings-total">R$ 0,00</strong></article>
                       <article class="balance-card"><span>Disponível para solicitar</span><strong id="earnings-available">R$ 0,00</strong></article>
                     </div>
-                      <article class="earnings-note"><h3>Como ler estes números</h3><p id="earnings-rate">Seu percentual e a estimativa por mil visitas aparecerão aqui.</p><p>O contador e o saldo usam visitas qualificadas e únicas. A taxa nova vale para visitas futuras. Isso não representa CPM, cliques em anúncios nem receita confirmada do Google.</p></article>
+                      <article class="earnings-note"><h3>Como ler estes números</h3><p id="earnings-rate">Seu percentual e a estimativa por mil visitas aparecerão aqui.</p><p>O saldo conta uma abertura confirmada por visitante e colaborador por dia, depois do clique em “Abrir destino”. Visualizações, robôs, repetição no mesmo dia e seus próprios acessos não geram repasse. Isso não representa cliques em anúncios, CPM nem receita confirmada do Google; saques são conferidos manualmente.</p></article>
                   </section>
 
                   <section class="workspace-page" data-dashboard-area="payouts" hidden>
@@ -184,7 +184,7 @@
                     <h4>Valor-base interno por mil visitas</h4><p class="field-help">Este é o valor de repasse do Urtador para visitas qualificadas; não é o CPM nem a receita real de anúncios. A mudança vale para visitas futuras. Cada registro guarda o valor vigente na data.</p>
                     <form id="reward-base-form" class="ad-config-form"><label class="field"><span>Valor-base (R$ por 1.000 visitas qualificadas)</span><input id="reward-base-value" type="number" min="0" max="500" step="0.01" required></label><button class="button" type="submit">Salvar valor-base</button><p id="reward-base-message" class="message" aria-live="polite"></p></form>
                     <h4>Usuários e repasse</h4><p class="field-help">Ajuste o percentual do valor-base para cada conta. O valor estimado por mil visitas aparece junto ao campo; mudanças valem para visitas futuras.</p><div class="table-wrap admin-users-wrap"><table class="admin-users-table"><thead><tr><th>Conta</th><th>Repasse por 1.000 visitas</th><th>Ação</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
-                    <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Visitas totais</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
+                    <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Cliques únicos</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
                     <h4>Publicidade em conteúdo</h4>
                     <p class="field-help">O Adsterra pode exibir banners rotativos na página Guia e na etapa 2/2 do redirecionamento. O anúncio aparece em uma área própria; abrir o destino não depende de ver ou clicar nele. O Google AdSense permanece em espera até a aprovação do site. Os campos de titular organizam os banners, não apuram receita real.</p>
                     <p id="ad-owner-summary" class="field-help" aria-live="polite">A titularidade será resumida aqui após carregar os anúncios salvos.</p>

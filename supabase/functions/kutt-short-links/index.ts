@@ -101,6 +101,10 @@ function clientIp(request: Request) {
   return request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
 
+function saoPauloDay(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(date);
+}
+
 function normalizeSlug(input?: string) {
   return String(input ?? "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48)
     || crypto.randomUUID().replace(/-/g, "").slice(0, 8);
@@ -325,7 +329,7 @@ async function verifyOtp(request: Request, payload: Payload) {
 async function profile(request: Request, payload: Payload) {
   const { user, session } = await requireUser(request, payload);
   const { data: links, error } = await supabase.from("kutt_short_links")
-    .select("id, slug, target_url, title, created_at, click_count").eq("owner_user_id", user.id).order("created_at", { ascending: false }).limit(100);
+    .select("id, slug, target_url, title, created_at, qualified_click_count").eq("owner_user_id", user.id).order("created_at", { ascending: false }).limit(100);
   if (error) throw error;
   const { count: eligibleVisits, error: visitError } = await supabase.from("kutt_short_link_events")
     .select("id", { count: "exact", head: true }).in("link_id", (links ?? []).map((item) => item.id).length ? (links ?? []).map((item) => item.id) : ["00000000-0000-0000-0000-000000000000"])
@@ -412,30 +416,28 @@ function looksAutomated(userAgent: string) {
 }
 
 async function resolveLink(request: Request, payload: Payload) {
-  await rateLimit(request, "resolve", 600, 60);
+  await rateLimit(request, "resolve", 120, 60);
   const slug = normalizeSlug(payload.slug);
   const { data, error } = await supabase.from("kutt_short_links").select("id, target_url, disabled_at, owner_user_id, creator_ip_hash")
     .eq("slug", slug).maybeSingle();
   if (error) throw error;
   if (!data || data.disabled_at) throw new Error("Link não encontrado.");
   const userAgent = request.headers.get("user-agent")?.slice(0, 500) ?? "";
-  const visitorHash = await hash(clientIp(request));
-  const eligible = Boolean(data.owner_user_id) && !looksAutomated(userAgent) && clientIp(request) !== "unknown" && visitorHash !== data.creator_ip_hash;
-  const { data: event, error: eventError } = await supabase.from("kutt_short_link_events").insert({
-    link_id: data.id, visitor_ip_hash: visitorHash, user_agent: userAgent || null,
-    referer: request.headers.get("referer")?.slice(0, 500) ?? null, eligible_for_reward: eligible
-  }).select("id").maybeSingle();
-  if (eventError && eventError.code !== "23505") throw eventError;
-  if (event?.id) {
-    const { error: countError } = await supabase.rpc("kutt_increment_short_link_click", { row_id: data.id });
-    if (countError) throw countError;
-    if (eligible) {
-      const { data: owner, error: ownerError } = await supabase.from("kutt_users").select("payout_percent").eq("id", data.owner_user_id).maybeSingle();
-      if (ownerError) throw ownerError;
-      const rewardBaseCents = await currentRewardBaseCents();
-      const { error: rewardError } = await supabase.from("kutt_reward_visits").insert({ owner_user_id: data.owner_user_id, visitor_ip_hash: visitorHash, first_link_id: data.id, payout_percent: Number(owner?.payout_percent ?? 100), reward_base_cents: rewardBaseCents });
-      if (rewardError && rewardError.code !== "23505") throw rewardError;
-    }
+  const ip = clientIp(request);
+  const eligible = Boolean(data.owner_user_id) && !looksAutomated(userAgent) && ip !== "unknown" && (await hash(ip)) !== data.creator_ip_hash;
+  // Only a human-confirmed destination open with a known, non-creator IP can affect clicks or rewards.
+  // The database function commits the event, link counter, and reward together and enforces daily deduplication.
+  if (eligible) {
+    const visitorHash = await hash(ip);
+    const visitDay = saoPauloDay();
+    const { error: recordError } = await supabase.rpc("kutt_record_qualified_click", {
+      row_id: data.id,
+      visitor_ip_hash: visitorHash,
+      event_user_agent: userAgent || null,
+      event_referer: request.headers.get("referer")?.slice(0, 500) ?? null,
+      qualified_visit_day: visitDay
+    });
+    if (recordError) throw recordError;
   }
   return { url: data.target_url };
 }
@@ -523,8 +525,7 @@ async function adminReport(payload: Payload) {
   const endExclusive = new Date(`${end}T00:00:00Z`);
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
   const endTimestamp = endExclusive.toISOString();
-  const todayUtc = new Date();
-  todayUtc.setUTCHours(0, 0, 0, 0);
+  const todayUtc = new Date(`${saoPauloDay()}T00:00:00.000Z`);
   const referenceEndDate = new Date(todayUtc.getTime() - 86400000);
   const referenceStartDate = new Date(referenceEndDate.getTime() - 6 * 86400000);
   const referenceStart = referenceStartDate.toISOString().slice(0, 10);
@@ -600,8 +601,7 @@ function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<stri
     visitsByDay.set(day, (visitsByDay.get(day) ?? 0) + 1);
   }
   const pendingWithdrawals = withdrawals.filter((item) => item.status === "pending" || item.status === "approved");
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const today = new Date(`${saoPauloDay()}T00:00:00.000Z`);
   const daily = new Map<string, { day: string; qualifiedVisits: number; withdrawalRequests: number; requestedCents: number; openCents: number; paidCents: number }>();
   const ensureDay = (day: string) => {
     if (!daily.has(day)) daily.set(day, { day, qualifiedVisits: 0, withdrawalRequests: 0, requestedCents: 0, openCents: 0, paidCents: 0 });
@@ -678,7 +678,7 @@ async function adminAction(request: Request, payload: Payload) {
     const [users, withdrawals, links, visits, adConfiguration] = await Promise.all([
       readAllRows("kutt_users", "id, phone, role, pix_key, payout_percent, created_at", "created_at"),
       readAllRows("kutt_withdrawals", "id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at"),
-      readAllRows("kutt_short_links", "id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users!kutt_short_links_owner_user_id_fkey(phone)", "created_at"),
+      readAllRows("kutt_short_links", "id, slug, target_url, title, qualified_click_count, created_at, owner_user_id, user:kutt_users!kutt_short_links_owner_user_id_fkey(phone)", "created_at"),
       readAllRows("kutt_reward_visits", "owner_user_id, visit_day", "visit_day"),
       readAdConfiguration()
     ]);
