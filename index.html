@@ -12,7 +12,7 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20261007-ad-manager">
+    <link rel="stylesheet" href="assets/styles.css?v=20261007-ad-titles">
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -152,14 +152,15 @@
                     <h4>Publicidade em conteúdo</h4>
                     <p class="field-help">Configure anúncios da página Guia. Eles não aparecem no fluxo 1/2 → 2/2 e não bloqueiam links. O AdSense fica desligado até a aprovação do site. Anúncios não usam contagem regressiva.</p>
                     <form id="ad-config-form" class="ad-config-form">
-                      <label class="ad-config-toggle"><input id="adsense-primary" type="checkbox"> Ativar Auto ads do AdSense na página Guia (somente depois da aprovação)</label>
+                      <label class="ad-config-toggle"><input id="adsense-primary" type="checkbox"> Fornecedor principal: Google AdSense (ativar somente depois da aprovação)</label>
+                      <label class="field"><span>Título do Google AdSense</span><input id="adsense-title" type="text" maxlength="80" placeholder="Ex.: Auto ads — Guia Urtador"></label>
                       <div class="ad-code-grid">
-                        <label class="field"><span>Banner Adsterra 1</span><textarea id="banner-code-1" rows="5" placeholder="Cole o código completo 300×250 gerado no painel Adsterra"></textarea></label>
-                        <label class="field"><span>Banner Adsterra 2</span><textarea id="banner-code-2" rows="5" placeholder="Opcional"></textarea></label>
-                        <label class="field"><span>Banner Adsterra 3</span><textarea id="banner-code-3" rows="5" placeholder="Opcional"></textarea></label>
-                        <label class="field"><span>Banner Adsterra 4</span><textarea id="banner-code-4" rows="5" placeholder="Opcional"></textarea></label>
-                        <label class="field"><span>Banner Adsterra 5</span><textarea id="banner-code-5" rows="5" placeholder="Opcional"></textarea></label>
-                        <label class="field"><span>Banner Adsterra 6</span><textarea id="banner-code-6" rows="5" placeholder="Opcional"></textarea></label>
+                        <div class="ad-code-card"><label class="field"><span>Fornecedor</span><input type="text" value="Adsterra" readonly></label><label class="field"><span>Título do anúncio 1</span><input id="banner-title-1" type="text" maxlength="80" placeholder="Ex.: Banner Guia 1"></label><label class="field"><span>Código do banner</span><textarea id="banner-code-1" rows="5" placeholder="Cole o código completo gerado no painel Adsterra"></textarea></label></div>
+                        <div class="ad-code-card"><label class="field"><span>Fornecedor</span><input type="text" value="Adsterra" readonly></label><label class="field"><span>Título do anúncio 2</span><input id="banner-title-2" type="text" maxlength="80" placeholder="Opcional"></label><label class="field"><span>Código do banner</span><textarea id="banner-code-2" rows="5" placeholder="Opcional"></textarea></label></div>
+                        <div class="ad-code-card"><label class="field"><span>Fornecedor</span><input type="text" value="Adsterra" readonly></label><label class="field"><span>Título do anúncio 3</span><input id="banner-title-3" type="text" maxlength="80" placeholder="Opcional"></label><label class="field"><span>Código do banner</span><textarea id="banner-code-3" rows="5" placeholder="Opcional"></textarea></label></div>
+                        <div class="ad-code-card"><label class="field"><span>Fornecedor</span><input type="text" value="Adsterra" readonly></label><label class="field"><span>Título do anúncio 4</span><input id="banner-title-4" type="text" maxlength="80" placeholder="Opcional"></label><label class="field"><span>Código do banner</span><textarea id="banner-code-4" rows="5" placeholder="Opcional"></textarea></label></div>
+                        <div class="ad-code-card"><label class="field"><span>Fornecedor</span><input type="text" value="Adsterra" readonly></label><label class="field"><span>Título do anúncio 5</span><input id="banner-title-5" type="text" maxlength="80" placeholder="Opcional"></label><label class="field"><span>Código do banner</span><textarea id="banner-code-5" rows="5" placeholder="Opcional"></textarea></label></div>
+                        <div class="ad-code-card"><label class="field"><span>Fornecedor</span><input type="text" value="Adsterra" readonly></label><label class="field"><span>Título do anúncio 6</span><input id="banner-title-6" type="text" maxlength="80" placeholder="Opcional"></label><label class="field"><span>Código do banner</span><textarea id="banner-code-6" rows="5" placeholder="Opcional"></textarea></label></div>
                       </div>
                       <button class="button" type="submit">Salvar anúncios</button>
                       <p id="ad-config-message" class="message" aria-live="polite"></p>
@@ -198,6 +199,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261007-ad-manager"></script>
+    <script src="assets/app.js?v=20261007-ad-titles"></script>
   </body>
 </html>

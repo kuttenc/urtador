@@ -371,6 +371,8 @@ td a { color:var(--brand-strong); overflow-wrap:anywhere; }
 .ad-config-toggle { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 16px; color: var(--ink); font-weight: 700; line-height: 1.5; }
 .ad-config-toggle input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--accent); }
 .ad-code-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.ad-code-card { min-width: 0; padding: 13px; border: 1px solid rgba(67,225,166,.18); border-radius: 10px; background: rgba(5,13,23,.45); }
+.ad-code-card .field:last-child { margin-bottom: 0; }
 .workspace-main .field textarea { border-color:#c9ddd1; color:#16281f; background:#fbfefc; }
 .workspace-main .field textarea:focus { border-color:#07875c; box-shadow:0 0 0 4px rgba(32,217,149,.17); }
 .workspace-main .field textarea::placeholder { color:#84988e; }

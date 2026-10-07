@@ -12,6 +12,7 @@ type Payload = {
   pixKey?: string;
   withdrawalId?: string;
   adsenseEnabled?: boolean;
+  adsenseTitle?: string;
   adScripts?: unknown[];
   status?: "approved" | "paid" | "rejected";
   note?: string;
@@ -26,6 +27,7 @@ const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
 const greenApiUrl = (Deno.env.get("GREEN_API_URL") ?? "").replace(/\/$/, "");
 const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID") ?? "";
 const greenApiToken = Deno.env.get("GREEN_API_TOKEN") ?? "";
+const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? "").replace(/@g\.us$/i, "");
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -103,8 +105,11 @@ function normalizeUrl(input?: string) {
 }
 
 function parseAdsterraBanner(input: unknown, index: number) {
-  const source = String(input ?? "").trim();
+  const entry = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const source = String(entry.code ?? input ?? "").trim();
   if (!source) return null;
+  const title = String(entry.title ?? "").trim();
+  if (!title || title.length > 80) throw new Error(`Informe um título de até 80 caracteres para o anúncio ${index}.`);
   if (source.length > 12000) throw new Error(`O código do anúncio ${index} excede o limite de 12 mil caracteres.`);
   const keyMatch = source.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{32})['"]/i);
   const widthMatch = source.match(/['"]width['"]\s*:\s*(\d{2,4})/i);
@@ -124,7 +129,7 @@ function parseAdsterraBanner(input: unknown, index: number) {
     throw new Error(`O anúncio ${index} usa uma origem não reconhecida. Use o código gerado para seu site no painel oficial Adsterra.`);
   }
   if (width < 120 || width > 728 || height < 50 || height > 600) throw new Error(`As dimensões do anúncio ${index} estão fora do limite permitido.`);
-  return { key, width, height, host: scriptUrl.hostname.toLowerCase() };
+  return { title, key, width, height, host: scriptUrl.hostname.toLowerCase() };
 }
 
 function formatAdsterraBanner(slot: Record<string, unknown>) {
@@ -431,6 +436,19 @@ function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<stri
   };
 }
 
+async function notifyAdConfigurationGroup(message: string) {
+  if (!adNotificationGroupId || !greenApiUrl || !greenApiInstance || !greenApiToken) return false;
+  const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chatId: `${adNotificationGroupId}@g.us`, message })
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok || result?.error) return false;
+  return true;
+}
+
 async function readAdConfiguration() {
   const { data, error } = await supabase.from("kutt_ad_configuration")
     .select("adsense_enabled, adsterra_slots").eq("id", true).maybeSingle();
@@ -438,6 +456,7 @@ async function readAdConfiguration() {
   const slots = Array.isArray(data?.adsterra_slots) ? data.adsterra_slots : [];
   return {
     adsenseEnabled: Boolean(data?.adsense_enabled),
+    adsenseTitle: String(data?.adsense_title ?? ""),
     slots: slots.map((slot: Record<string, unknown>) => ({ ...slot, script: formatAdsterraBanner(slot) }))
   };
 }
@@ -462,17 +481,27 @@ async function adminAction(request: Request, payload: Payload) {
   }
   if (payload.action === "admin-save-ad-configuration") {
     if (typeof payload.adsenseEnabled !== "boolean") throw new Error("Informe se o AdSense está habilitado.");
+    const adsenseTitle = String(payload.adsenseTitle ?? "").trim();
+    if (payload.adsenseEnabled && (!adsenseTitle || adsenseTitle.length > 80)) throw new Error("Informe um título de até 80 caracteres para o Google AdSense.");
     if (!Array.isArray(payload.adScripts) || payload.adScripts.length !== 6) throw new Error("Envie os seis campos de banner, mesmo que alguns estejam vazios.");
     const slots = payload.adScripts.map((script, index) => parseAdsterraBanner(script, index + 1)).filter(Boolean);
     const { error } = await supabase.from("kutt_ad_configuration").upsert({
       id: true,
       adsense_enabled: payload.adsenseEnabled,
+      adsense_title: adsenseTitle,
       adsterra_slots: slots,
       updated_at: new Date().toISOString(),
       updated_by: user.id
     }, { onConflict: "id" });
     if (error) throw error;
-    return { ok: true, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, slots } };
+    const activeProviders = [
+      ...(slots.length ? [`Adsterra (${slots.map((slot) => slot.title).join(", ")})`] : []),
+      ...(payload.adsenseEnabled ? [`Google AdSense (${adsenseTitle}; aguardando aprovação antes de ativar na página)`] : [])
+    ];
+    const notified = activeProviders.length
+      ? await notifyAdConfigurationGroup(`✅ Atualização de anúncios salva no Urtador. Fornecedor(es) configurado(s): ${activeProviders.join("; ")}. Os anúncios são exibidos somente na página Guia. Google AdSense: ${payload.adsenseEnabled ? "marcado como habilitado" : "desligado"}; a veiculação depende da aprovação do site.`)
+      : false;
+    return { ok: true, notificationSent: notified, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, adsenseTitle, slots } };
   }
   if (payload.action === "admin-withdrawal") {
     const status = payload.status;

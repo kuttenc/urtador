@@ -22,6 +22,7 @@ Configure estes secrets em **Supabase → Edge Functions → Secrets** antes de 
 | `GREEN_API_URL` | URL da conta Green API usada para enviar os códigos |
 | `GREEN_API_INSTANCE_ID` | Instância autorizada do WhatsApp |
 | `GREEN_API_TOKEN` | Token da instância, guardado só no servidor |
+| `KUTT_AD_NOTIFICATION_GROUP_ID` | ID do grupo WhatsApp que recebe avisos após salvar anúncios |
 | `OWNER_PHONE` | Telefone administrador em formato internacional, por exemplo `5511989346164` |
 | `OTP_PEPPER` | Segredo aleatório longo para proteger hashes dos códigos |
 | `PUBLIC_BASE_URL` | `https://kuttenc.github.io/urtador` |
@@ -33,7 +34,7 @@ Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto 
 npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
-As migrações SQL criam as tabelas e políticas necessárias. A migração `202610070001` adiciona a configuração administrativa de publicidade; ela deve ser aplicada antes de publicar a Edge Function atualizada.
+As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001` e `202610070002` adicionam configuração administrativa de publicidade e títulos obrigatórios para anúncios habilitados; aplique-as antes de publicar a Edge Function atualizada.
 
 ## Acesso e pagamentos
 
@@ -48,3 +49,5 @@ O administrador configura Auto ads do AdSense e até seis banners Adsterra no pa
 ## Teste local
 
 Abra `index.html` diretamente no navegador ou sirva a pasta com qualquer servidor estatico.
+
+A migração 202610070002 adiciona o título obrigatório para fornecedores/anúncios ativos; AdSense também exige título quando habilitado. O painel identifica Google AdSense e Adsterra explicitamente.

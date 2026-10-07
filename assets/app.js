@@ -219,7 +219,9 @@
     }
     const adConfiguration = data.adConfiguration || { adsenseEnabled: false, slots: [] };
     el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);
+    el("adsense-title").value = adConfiguration.adsenseTitle || "";
     for (let index = 0; index < 6; index++) {
+      el(`banner-title-${index + 1}`).value = adConfiguration.slots?.[index]?.title || "";
       el(`banner-code-${index + 1}`).value = adConfiguration.slots?.[index]?.script || "";
     }
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
@@ -364,9 +366,11 @@
     try {
       const result = await api("admin-save-ad-configuration", {
         adsenseEnabled: el("adsense-primary").checked,
-        adScripts: Array.from({ length: 6 }, (_, index) => el(`banner-code-${index + 1}`).value)
+        adsenseTitle: el("adsense-title").value,
+        adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value }))
       });
-      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) na página Guia. O redirecionamento permanece sem anúncios e sem espera.`);
+      const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " Não foi possível enviar o aviso ao grupo; confira a conexão do WhatsApp.";
+      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) na página Guia. O redirecionamento permanece sem anúncios e sem espera.${groupNotice}`);
       await refreshAdmin();
     } catch (error) {
       say(el("ad-config-message"), error.message, true);
