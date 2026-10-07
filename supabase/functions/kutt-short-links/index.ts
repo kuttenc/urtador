@@ -439,14 +439,17 @@ function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<stri
 async function notifyAdConfigurationGroup(message: string) {
   if (!adNotificationGroupId || !greenApiUrl || !greenApiInstance || !greenApiToken) return false;
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chatId: `${adNotificationGroupId}@g.us`, message })
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok || result?.error) return false;
-  return true;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId: `${adNotificationGroupId}@g.us`, message })
+    });
+    const result = await response.json().catch(() => ({}));
+    return response.ok && !result?.error;
+  } catch {
+    return false;
+  }
 }
 
 async function readAdConfiguration() {
