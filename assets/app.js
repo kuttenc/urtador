@@ -364,6 +364,17 @@
     el("report-estimated").textContent = money(totals.estimatedAccrualCents);
     el("report-paid").textContent = money(totals.paidPixCents);
     el("report-open").textContent = money(totals.openPixCents);
+    const forecast = report.forecast || {};
+    el("admin-forecast-heading").hidden = false;
+    el("admin-forecast-note").hidden = false;
+    el("admin-forecast-totals").hidden = false;
+    el("forecast-unpaid").textContent = money(forecast.unpaidAccruedCents);
+    el("forecast-week").textContent = money(forecast.reserveSevenDaysCents);
+    el("forecast-month").textContent = money(forecast.reserveThirtyDaysCents);
+    const basis = Number(forecast.sampleVisitCount || 0) === 0
+      ? "Não houve visitas qualificadas nos últimos sete dias completos; a previsão de novos repasses fica em zero até haver histórico."
+      : `Base: média dos sete dias completos de ${dateOnly(forecast.referenceStart)} a ${dateOnly(forecast.referenceEnd)}.`;
+    el("admin-forecast-note").textContent = `${basis} A reserva potencial soma essa projeção ao saldo de repasses estimado e ainda não marcado como pago. É uma estimativa de planejamento, não um valor de saque confirmado.`;
     const body = el("admin-report-body"); body.replaceChildren();
     state.adminReportRows = report.rows || [];
     for (const item of state.adminReportRows) {

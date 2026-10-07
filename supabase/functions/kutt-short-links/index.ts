@@ -523,10 +523,19 @@ async function adminReport(payload: Payload) {
   const endExclusive = new Date(`${end}T00:00:00Z`);
   endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
   const endTimestamp = endExclusive.toISOString();
-  const [visits, paidWithdrawals, openWithdrawals] = await Promise.all([
+  const todayUtc = new Date();
+  todayUtc.setUTCHours(0, 0, 0, 0);
+  const referenceEndDate = new Date(todayUtc.getTime() - 86400000);
+  const referenceStartDate = new Date(referenceEndDate.getTime() - 6 * 86400000);
+  const referenceStart = referenceStartDate.toISOString().slice(0, 10);
+  const referenceEnd = referenceEndDate.toISOString().slice(0, 10);
+  const [visits, paidWithdrawals, openWithdrawals, referenceVisits, allVisits, allWithdrawals] = await Promise.all([
     readRowsBetween("kutt_reward_visits", "owner_user_id, visit_day, payout_percent, reward_base_cents, user:kutt_users!kutt_reward_visits_owner_user_id_fkey(phone)", "visit_day", start, end),
     readRowsBetween("kutt_withdrawals", "user_id, amount_cents, status, processed_at, requested_at, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "processed_at", `${start}T00:00:00.000Z`, endTimestamp),
-    readRowsBetween("kutt_withdrawals", "user_id, amount_cents, status, processed_at, requested_at, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at", `${start}T00:00:00.000Z`, endTimestamp)
+    readRowsBetween("kutt_withdrawals", "user_id, amount_cents, status, processed_at, requested_at, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at", `${start}T00:00:00.000Z`, endTimestamp),
+    readRowsBetween("kutt_reward_visits", "payout_percent, reward_base_cents", "visit_day", referenceStart, referenceEnd),
+    readAllRows("kutt_reward_visits", "payout_percent, reward_base_cents", "visit_day"),
+    readAllRows("kutt_withdrawals", "amount_cents, status", "requested_at")
   ]);
   const grouped = new Map<string, { period: string; userId: string; phone: string; qualifiedVisits: number; estimatedAccrualCents: number; paidPixCents: number; openPixCents: number }>();
   const ensure = (period: string, userId: string, phone: string) => {
@@ -556,13 +565,31 @@ async function adminReport(payload: Payload) {
   }
   const rows = [...grouped.values()].map((row) => ({ ...row, estimatedAccrualCents: Math.floor(row.estimatedAccrualCents / 10_000_000) }))
     .sort((a, b) => a.period.localeCompare(b.period) || a.phone.localeCompare(b.phone));
+  const numeratorFor = (items: Record<string, any>[]) => items.reduce((sum, item) =>
+    sum + Math.round(Number(item.payout_percent ?? 100) * 100) * Number(item.reward_base_cents ?? 7000), 0);
+  const recentAccruedCents = numeratorFor(referenceVisits) / 10_000_000;
+  const accruedToDateCents = Math.floor(numeratorFor(allVisits) / 10_000_000);
+  const paidToDateCents = allWithdrawals.filter((item) => item.status === "paid")
+    .reduce((sum, item) => sum + Number(item.amount_cents ?? 0), 0);
+  const unpaidAccruedCents = Math.max(0, accruedToDateCents - paidToDateCents);
+  const projectedSevenDaysCents = Math.round(recentAccruedCents);
+  const projectedThirtyDaysCents = Math.round(recentAccruedCents * 30 / 7);
   return {
     start, end, group,
     totals: rows.reduce((total, row) => ({ qualifiedVisits: total.qualifiedVisits + row.qualifiedVisits,
       estimatedAccrualCents: total.estimatedAccrualCents + row.estimatedAccrualCents,
       paidPixCents: total.paidPixCents + row.paidPixCents, openPixCents: total.openPixCents + row.openPixCents }),
     { qualifiedVisits: 0, estimatedAccrualCents: 0, paidPixCents: 0, openPixCents: 0 }),
-    rows
+    rows,
+    forecast: {
+      referenceStart, referenceEnd,
+      sampleVisitCount: referenceVisits.length,
+      unpaidAccruedCents,
+      newSevenDaysCents: projectedSevenDaysCents,
+      newThirtyDaysCents: projectedThirtyDaysCents,
+      reserveSevenDaysCents: unpaidAccruedCents + projectedSevenDaysCents,
+      reserveThirtyDaysCents: unpaidAccruedCents + projectedThirtyDaysCents
+    }
   };
 }
 

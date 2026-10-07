@@ -45,7 +45,7 @@ No primeiro acesso, um código de seis dígitos enviado pelo WhatsApp confirma o
 
 O valor-base é R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Administradores podem ajustar de 0% a 100% do valor-base para cada conta. A nova taxa é registrada em cada nova visita elegível; visitas anteriores mantêm a taxa que tinham. Isso não é o CPM real nem a receita de anúncios do Google AdSense.
 
-O painel administrativo também gera relatórios por período e agrupamento diário, semanal ou mensal. Mostra a estimativa interna de repasse pelas visitas registradas, os Pix que administradores marcaram como pagos e os pedidos ainda em aberto, com exportação CSV. Esses números não são receita confirmada dos fornecedores de anúncios.
+O painel administrativo também gera relatórios por período e agrupamento diário, semanal ou mensal. Mostra a estimativa interna de repasse pelas visitas registradas, os Pix que administradores marcaram como pagos e os pedidos ainda em aberto, com exportação CSV. A previsão de reserva para 7 e 30 dias projeta a média dos últimos sete dias completos e soma o saldo de repasses estimado ainda não marcado como pago. Esses números não são receita confirmada dos fornecedores de anúncios nem uma garantia de quando alguém solicitará saque.
 
 ## Anúncios
 
