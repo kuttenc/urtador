@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Abrindo link - Urtador</title>
-    <link rel="stylesheet" href="/urtador/assets/styles.css?v=20261006-countdown">
+    <title>Conferir destino - Urtador</title>
+    <link rel="stylesheet" href="/urtador/assets/styles.css?v=20261007-redirect-steps">
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -24,14 +24,26 @@
           Quer criar um link curto também?
           <a href="https://kuttenc.github.io/urtador/">Conheça o Urtador</a>
         </p>
-        <h1>Abrindo link</h1>
-        <p class="message" data-redirect-status>Preparando redirecionamento...</p>
-        <p class="redirect-countdown" data-redirect-countdown hidden>Tempo restante: 01:00</p>
-        <button class="redirect-continue" data-redirect-continue type="button" hidden disabled>Continuar</button>
+        <div class="redirect-step" data-redirect-step="1">
+          <p class="redirect-progress">Etapa <strong>1/2</strong> · Conferir endereço</p>
+          <h1>Confira o destino</h1>
+          <p class="message" data-redirect-status>Carregando o endereço informado por quem criou este link...</p>
+          <p class="redirect-destination" data-redirect-destination hidden></p>
+          <p class="redirect-note" data-redirect-note hidden>Confira o domínio e só continue se reconhecer o endereço.</p>
+          <button class="redirect-continue" data-redirect-review type="button" hidden>Endereço conferido · Próxima etapa</button>
+        </div>
+        <div class="redirect-step" data-redirect-step="2" hidden>
+          <p class="redirect-progress">Etapa <strong>2/2</strong> · Abrir destino</p>
+          <h1>Você está saindo do Urtador</h1>
+          <p class="message">Este é o endereço que será aberto:</p>
+          <p class="redirect-destination" data-redirect-destination-final></p>
+          <p class="redirect-note">Ao tocar em “Abrir destino”, você continuará para este site externo.</p>
+          <button class="redirect-continue" data-redirect-open type="button">Abrir destino</button>
+          <button class="redirect-back" data-redirect-back type="button">Voltar e conferir</button>
+        </div>
       </section>
     </main>
     <script src="/urtador/assets/config.js"></script>
-    <script src="/urtador/assets/redirect.js?v=20261006-countdown"></script>
+    <script src="/urtador/assets/redirect.js?v=20261007-redirect-steps"></script>
   </body>
 </html>
-

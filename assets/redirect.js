@@ -3,8 +3,13 @@
   const apiBase = `${String(config.supabaseUrl || "").replace(/\/$/, "")}/functions/v1/${config.functionName || "kutt-short-links"}`;
   const basePath = config.basePath || "/urtador/";
   const status = document.querySelector("[data-redirect-status]");
-  const countdownText = document.querySelector("[data-redirect-countdown]");
-  const continueLink = document.querySelector("[data-redirect-continue]");
+  const reviewButton = document.querySelector("[data-redirect-review]");
+  const openButton = document.querySelector("[data-redirect-open]");
+  const backButton = document.querySelector("[data-redirect-back]");
+  const destinationText = document.querySelector("[data-redirect-destination]");
+  const destinationNote = document.querySelector("[data-redirect-note]");
+  const finalDestinationText = document.querySelector("[data-redirect-destination-final]");
+  const steps = [...document.querySelectorAll("[data-redirect-step]")];
   let destinationUrl = "";
   const path = window.location.pathname;
   const index = path.indexOf(basePath);
@@ -14,15 +19,16 @@
     if (status) status.textContent = text;
   }
 
-  function writeRemaining(seconds) {
-    if (!countdownText) return;
-    const minutes = Math.floor(seconds / 60).toString().padStart(2, "0");
-    const remainingSeconds = (seconds % 60).toString().padStart(2, "0");
-    countdownText.textContent = `Tempo restante: ${minutes}:${remainingSeconds}`;
+  function showStep(number) {
+    steps.forEach((step) => {
+      step.hidden = step.dataset.redirectStep !== String(number);
+    });
   }
 
-  continueLink?.addEventListener("click", () => {
-    if (!continueLink.disabled && destinationUrl) window.location.assign(destinationUrl);
+  reviewButton?.addEventListener("click", () => showStep(2));
+  backButton?.addEventListener("click", () => showStep(1));
+  openButton?.addEventListener("click", () => {
+    if (destinationUrl) window.location.assign(destinationUrl);
   });
 
   if (!slug) {
@@ -39,34 +45,21 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.url) throw new Error(data.error || "Link nao encontrado.");
-    destinationUrl = data.url;
-    if (continueLink) {
-      continueLink.textContent = "Aguarde 60 segundos";
-      continueLink.hidden = false;
+    const parsedDestination = new URL(data.url);
+    if (!["http:", "https:"].includes(parsedDestination.protocol)) throw new Error("Este link não possui um destino web válido.");
+    destinationUrl = parsedDestination.href;
+    if (destinationText) {
+      destinationText.textContent = parsedDestination.href;
+      destinationText.hidden = false;
     }
-    let secondsLeft = 60;
-    writeRemaining(secondsLeft);
-    if (countdownText) countdownText.hidden = false;
-    write(`O botão será liberado em ${secondsLeft} segundos.`);
-    const countdown = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      secondsLeft -= 1;
-      if (secondsLeft <= 0) {
-        window.clearInterval(countdown);
-        writeRemaining(0);
-        if (continueLink) {
-          continueLink.disabled = false;
-          continueLink.textContent = "Continuar para o destino";
-        }
-        write("Pronto. Toque no botão para abrir o destino.");
-        return;
-      }
-      writeRemaining(secondsLeft);
-      if (continueLink) continueLink.textContent = `Aguarde ${secondsLeft} segundos`;
-      write(`O botão será liberado em ${secondsLeft} segundos.`);
-    }, 1000);
+    if (finalDestinationText) finalDestinationText.textContent = parsedDestination.href;
+    if (destinationNote) destinationNote.hidden = false;
+    if (reviewButton) {
+      reviewButton.disabled = false;
+      reviewButton.hidden = false;
+    }
+    write("Confira o endereço acima. Se você o reconhecer, avance para confirmar a abertura.");
   } catch (error) {
     write(error.message || "Link nao encontrado.");
   }
 })();
-
