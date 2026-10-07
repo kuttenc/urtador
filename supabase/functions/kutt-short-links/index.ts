@@ -11,6 +11,8 @@ type Payload = {
   title?: string;
   pixKey?: string;
   withdrawalId?: string;
+  userId?: string;
+  payoutPercent?: number;
   adsenseEnabled?: boolean;
   adsenseTitle?: string;
   adScripts?: unknown[];
@@ -149,7 +151,7 @@ async function requireUser(request: Request, payload: Payload, allowPasswordSetu
   if (!token || token.length < 20) throw new Error("Entre com seu telefone para continuar.");
   const tokenHash = await hash(token);
   const { data, error } = await supabase.from("kutt_sessions")
-    .select("id, expires_at, user:kutt_users(id, phone, role, pix_key, password_hash)")
+    .select("id, expires_at, user:kutt_users(id, phone, role, pix_key, password_hash, payout_percent)")
     .eq("token_hash", tokenHash).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
   if (error) throw error;
   if (!data?.user) throw new Error("Sua sessão expirou. Entre novamente pelo WhatsApp.");
@@ -297,11 +299,25 @@ async function profile(request: Request, payload: Payload) {
   const { data: withdrawals, error: withdrawalError } = await supabase.from("kutt_withdrawals")
     .select("id, amount_cents, pix_key, status, requested_at, processed_at, admin_note").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(20);
   if (withdrawalError) throw withdrawalError;
-  const { count: rewardedVisits, error: rewardsError } = await supabase.from("kutt_reward_visits").select("id", { count: "exact", head: true }).eq("owner_user_id", user.id);
-  if (rewardsError) throw rewardsError;
-  const earnedCents = Math.floor((rewardedVisits ?? 0) / 1000) * 7000;
+  const rewards = await readRewardBalance(user.id);
   const reservedCents = (withdrawals ?? []).filter((w) => w.status !== "rejected").reduce((sum, w) => sum + Number(w.amount_cents), 0);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key }, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewardedVisits ?? 0, rawLinkVisits: eligibleVisits ?? 0, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+}
+
+async function readRewardBalance(userId: string) {
+  const pageSize = 1000;
+  let visitCount = 0;
+  let totalRateBasisPoints = 0;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from("kutt_reward_visits").select("payout_percent")
+      .eq("owner_user_id", userId).order("id", { ascending: true }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    visitCount += rows.length;
+    for (const row of rows) totalRateBasisPoints += Math.round(Number(row.payout_percent ?? 100) * 100);
+    if (rows.length < pageSize) break;
+  }
+  return { visitCount, earnedCents: Math.floor(totalRateBasisPoints / 10_000_000) * 7000 };
 }
 
 async function createLink(request: Request, payload: Payload) {
@@ -341,7 +357,9 @@ async function resolveLink(request: Request, payload: Payload) {
     const { error: countError } = await supabase.rpc("kutt_increment_short_link_click", { row_id: data.id });
     if (countError) throw countError;
     if (eligible) {
-      const { error: rewardError } = await supabase.from("kutt_reward_visits").insert({ owner_user_id: data.owner_user_id, visitor_ip_hash: visitorHash, first_link_id: data.id });
+      const { data: owner, error: ownerError } = await supabase.from("kutt_users").select("payout_percent").eq("id", data.owner_user_id).maybeSingle();
+      if (ownerError) throw ownerError;
+      const { error: rewardError } = await supabase.from("kutt_reward_visits").insert({ owner_user_id: data.owner_user_id, visitor_ip_hash: visitorHash, first_link_id: data.id, payout_percent: Number(owner?.payout_percent ?? 100) });
       if (rewardError && rewardError.code !== "23505") throw rewardError;
     }
   }
@@ -367,9 +385,7 @@ async function logout(request: Request, payload: Payload) {
 async function requestWithdrawal(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   if (!user.pix_key) throw new Error("Cadastre sua chave Pix antes de solicitar saque.");
-  const { count, error: countError } = await supabase.from("kutt_reward_visits").select("id", { count: "exact", head: true }).eq("owner_user_id", user.id);
-  if (countError) throw countError;
-  const earned = Math.floor((count ?? 0) / 1000) * 7000;
+  const { earnedCents: earned } = await readRewardBalance(user.id);
   const { data: withdrawals, error: withdrawalError } = await supabase.from("kutt_withdrawals").select("amount_cents, status")
     .eq("user_id", user.id).neq("status", "rejected");
   if (withdrawalError) throw withdrawalError;
@@ -436,7 +452,7 @@ function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<stri
   };
 }
 
-async function notifyAdConfigurationGroup(message: string) {
+async function notifyCollaboratorGroup(message: string) {
   if (!adNotificationGroupId || !greenApiUrl || !greenApiInstance || !greenApiToken) return false;
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
   try {
@@ -474,13 +490,33 @@ async function adminAction(request: Request, payload: Payload) {
   if (user.role !== "admin" || !adminPhones.has(user.phone)) throw new Error("Acesso restrito ao administrador.");
   if (payload.action === "admin-list") {
     const [users, withdrawals, links, visits, adConfiguration] = await Promise.all([
-      readAllRows("kutt_users", "id, phone, role, pix_key, created_at", "created_at"),
+      readAllRows("kutt_users", "id, phone, role, pix_key, payout_percent, created_at", "created_at"),
       readAllRows("kutt_withdrawals", "id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at"),
       readAllRows("kutt_short_links", "id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users!kutt_short_links_owner_user_id_fkey(phone)", "created_at"),
       readAllRows("kutt_reward_visits", "owner_user_id, visit_day", "visit_day"),
       readAdConfiguration()
     ]);
     return { users, withdrawals, links, adConfiguration, summary: makeAdminSummary(users, withdrawals, links, visits) };
+  }
+  if (payload.action === "admin-set-user-payout") {
+    const userId = String(payload.userId ?? "");
+    const payoutPercent = Number(payload.payoutPercent);
+    if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new Error("Selecione um colaborador válido.");
+    if (!Number.isFinite(payoutPercent) || payoutPercent < 0 || payoutPercent > 100) throw new Error("A porcentagem deve estar entre 0 e 100.");
+    const { data: target, error: targetError } = await supabase.from("kutt_users").select("id, phone, payout_percent").eq("id", userId).maybeSingle();
+    if (targetError) throw targetError;
+    if (!target) throw new Error("Colaborador não encontrado.");
+    const nextPercent = Math.round(payoutPercent * 100) / 100;
+    if (Number(target.payout_percent ?? 100) === nextPercent) return { ok: true, notificationSent: false, unchanged: true };
+    const { error } = await supabase.from("kutt_users").update({ payout_percent: nextPercent, updated_at: new Date().toISOString() }).eq("id", userId);
+    if (error) throw error;
+    const ratePerThousandCents = Math.round(7000 * nextPercent / 100);
+    const maskedPhone = `final ${String(target.phone).slice(-4)}`;
+    const formattedPercent = nextPercent.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const formattedRate = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ratePerThousandCents / 100);
+    const message = `📊 Taxa de ganhos atualizada no Urtador\nColaborador: ${maskedPhone}\nPercentual: ${formattedPercent}% do valor-base.\nReferência: ${formattedRate} por 1.000 visitas qualificadas e únicas.\nA nova taxa vale para visitas futuras; registros anteriores mantêm a taxa que tinham. Esse valor é uma regra interna do Urtador, não o CPM nem a receita real do Google AdSense.`;
+    const notificationSent = await notifyCollaboratorGroup(message);
+    return { ok: true, notificationSent, payoutPercent: nextPercent, ratePerThousandCents };
   }
   if (payload.action === "admin-save-ad-configuration") {
     if (typeof payload.adsenseEnabled !== "boolean") throw new Error("Informe se o AdSense está habilitado.");
@@ -502,7 +538,7 @@ async function adminAction(request: Request, payload: Payload) {
       ...(payload.adsenseEnabled ? [`Google AdSense (${adsenseTitle}; aguardando aprovação antes de ativar na página)`] : [])
     ];
     const notified = activeProviders.length
-      ? await notifyAdConfigurationGroup(`✅ Atualização de anúncios salva no Urtador. Fornecedor(es) configurado(s): ${activeProviders.join("; ")}. Os anúncios são exibidos somente na página Guia. Google AdSense: ${payload.adsenseEnabled ? "marcado como habilitado" : "desligado"}; a veiculação depende da aprovação do site.`)
+      ? await notifyCollaboratorGroup(`✅ Atualização de anúncios salva no Urtador. Fornecedor(es) configurado(s): ${activeProviders.join("; ")}. Os anúncios são exibidos somente na página Guia. Google AdSense: ${payload.adsenseEnabled ? "marcado como habilitado" : "desligado"}; a veiculação depende da aprovação do site.`)
       : false;
     return { ok: true, notificationSent: notified, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, adsenseTitle, slots } };
   }
@@ -542,6 +578,7 @@ Deno.serve(async (request) => {
       case "public-ad-configuration": return json(request, 200, await publicAdConfiguration());
       case "admin-list":
       case "admin-withdrawal":
+      case "admin-set-user-payout":
       case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));
       default: return json(request, 400, { error: "Ação inválida." });
     }

@@ -12,7 +12,7 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20261007-ad-titles">
+    <link rel="stylesheet" href="assets/styles.css?v=20261007-rates">
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -112,7 +112,7 @@
                       <article class="balance-card"><span>Saldo registrado</span><strong id="earnings-total">R$ 0,00</strong></article>
                       <article class="balance-card"><span>Disponível para solicitar</span><strong id="earnings-available">R$ 0,00</strong></article>
                     </div>
-                    <article class="earnings-note"><h3>Como ler estes números</h3><p>O contador e o saldo mostram os registros do Urtador conforme a regra vigente do serviço. A contagem não representa cliques em anúncios nem confirma receita do Google; o valor pode depender de validação e das regras de pagamento.</p></article>
+                      <article class="earnings-note"><h3>Como ler estes números</h3><p id="earnings-rate">Seu percentual e a estimativa por mil visitas aparecerão aqui.</p><p>O contador e o saldo usam visitas qualificadas e únicas. A taxa nova vale para visitas futuras. Isso não representa CPM, cliques em anúncios nem receita confirmada do Google.</p></article>
                   </section>
 
                   <section class="workspace-page" data-dashboard-area="payouts" hidden>
@@ -147,7 +147,7 @@
                     <p class="field-help">Visitas e solicitações vêm dos registros do Supabase. “Pix em aberto” soma solicitações aguardando conferência ou pagamento; não é uma previsão de receita de anúncios.</p>
                     <div class="table-wrap"><table><thead><tr><th>Data</th><th>Visitas qualificadas</th><th>Solicitações Pix · total</th><th>Pix em aberto</th><th>Pix pagos</th></tr></thead><tbody id="admin-daily-body"></tbody></table></div>
                     <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
-                    <h4>Usuários</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Perfil</th><th>Chave Pix</th><th>Cadastro</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
+                    <h4>Usuários e percentual de repasse</h4><p class="field-help">Edite de 0% a 100% do valor-base de R$ 70 por mil visitas qualificadas. A alteração vale para visitas futuras e avisa a comunidade pelo WhatsApp; não é o CPM real do fornecedor de anúncios.</p><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Perfil</th><th>Chave Pix</th><th>Cadastro</th><th>Repasse (%)</th><th>Ação</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
                     <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Visitas totais</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
                     <h4>Publicidade em conteúdo</h4>
                     <p class="field-help">Configure anúncios da página Guia. Eles não aparecem no fluxo 1/2 → 2/2 e não bloqueiam links. O AdSense fica desligado até a aprovação do site. Anúncios não usam contagem regressiva.</p>
@@ -199,6 +199,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261007-ad-titles"></script>
+    <script src="assets/app.js?v=20261007-rates"></script>
   </body>
 </html>

@@ -34,13 +34,13 @@ Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto 
 npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
-As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001` e `202610070002` adicionam configuração administrativa de publicidade e títulos obrigatórios para anúncios habilitados; aplique-as antes de publicar a Edge Function atualizada.
+As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001`–`202610070003` adicionam configuração de anúncios, títulos obrigatórios e taxas individuais de repasse; aplique-as antes de publicar a Edge Function atualizada.
 
 ## Acesso e pagamentos
 
 No primeiro acesso, um código de seis dígitos enviado pelo WhatsApp confirma o telefone e libera o cadastro de senha. A senha é armazenada como hash PBKDF2-SHA-256 com salt aleatório, nunca em texto aberto. Nos 48 horas após cada verificação do WhatsApp, a senha permite iniciar uma nova sessão; após esse prazo, a senha continua obrigatória e o sistema envia um novo código ao WhatsApp. Cada sessão expira em três horas. O telefone `OWNER_PHONE` é o único administrador; usuários comuns só veem os próprios links, cadastram a própria chave Pix e solicitam saque. O administrador confere a solicitação, aprova, faz o Pix por fora e marca como pago no painel.
 
-O painel calcula R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Essa regra deve ser mantida separada de impressões/cliques do Google AdSense; a página de redirecionamento não carrega código AdSense.
+O valor-base é R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Administradores podem ajustar de 0% a 100% do valor-base para cada conta. A nova taxa é registrada em cada nova visita elegível; visitas anteriores mantêm a taxa que tinham. Isso não é o CPM real nem a receita de anúncios do Google AdSense.
 
 ## Anúncios
 
@@ -50,4 +50,4 @@ O administrador configura Auto ads do AdSense e até seis banners Adsterra no pa
 
 Abra `index.html` diretamente no navegador ou sirva a pasta com qualquer servidor estatico.
 
-A migração 202610070002 adiciona o título obrigatório para fornecedores/anúncios ativos; AdSense também exige título quando habilitado. O painel identifica Google AdSense e Adsterra explicitamente.
+A migração `202610070002` adiciona títulos obrigatórios para fornecedores/anúncios ativos; AdSense também exige título quando habilitado. A migração `202610070003` adiciona taxas de repasse por usuário e preserva a taxa usada por visita.

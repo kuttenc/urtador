@@ -330,6 +330,7 @@ th,td { padding:10px; border-bottom:1px solid var(--line); text-align:left; vert
 th { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
 td a { color:var(--brand-strong); overflow-wrap:anywhere; }
 .button.small { min-height:34px; padding:0 10px; margin:2px; font-size:12px; }
+.rate-input { width: 92px; min-height: 36px; padding: 6px 8px; border: 1px solid #8eaaa0; border-radius: 7px; color: #17251e; background: #fff; }
 #short-link-result { display:block; margin-top:14px; }
 
 .result p { margin: 0 0 8px; color: var(--muted); }

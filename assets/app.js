@@ -119,6 +119,8 @@
     el("earnings-visits").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);
+    const payoutPercent = Number(data.user.payoutPercent ?? 100);
+    el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(7000 * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
     el("pix-key").value = data.user.pixKey || "";
     const linksBody = el("links-body");
     linksBody.replaceChildren();
@@ -207,7 +209,32 @@
       row.append(actions); withdrawalsBody.append(row);
     }
     const usersBody = el("admin-users-body"); usersBody.replaceChildren();
-    for (const item of data.users || []) { const row = document.createElement("tr"); cell(row, item.phone); cell(row, item.role); cell(row, item.pix_key || "—"); cell(row, date(item.created_at)); usersBody.append(row); }
+    for (const item of data.users || []) {
+      const row = document.createElement("tr");
+      cell(row, item.phone); cell(row, item.role); cell(row, item.pix_key || "—"); cell(row, date(item.created_at));
+      const rateCell = document.createElement("td");
+      const rateInput = document.createElement("input");
+      rateInput.className = "rate-input"; rateInput.type = "number"; rateInput.min = "0"; rateInput.max = "100"; rateInput.step = "0.01";
+      rateInput.value = String(Number(item.payout_percent ?? 100)); rateInput.setAttribute("aria-label", `Percentual do valor-base para ${item.phone}`);
+      rateCell.append(rateInput); row.append(rateCell);
+      const actionCell = document.createElement("td");
+      const saveRate = document.createElement("button"); saveRate.className = "button small"; saveRate.type = "button"; saveRate.textContent = "Salvar";
+      saveRate.addEventListener("click", async () => {
+        saveRate.disabled = true;
+        try {
+          const result = await api("admin-set-user-payout", { userId: item.id, payoutPercent: Number(rateInput.value) });
+          const percent = Number(result.payoutPercent ?? rateInput.value);
+          const perThousand = money(Number(result.ratePerThousandCents ?? Math.round(7000 * percent / 100)));
+          await refreshAdmin();
+          say(el("admin-load-message"), result.unchanged
+            ? `A taxa de ${item.phone} já era ${percent}%; nenhuma mudança ou mensagem enviada.`
+            : `Taxa de ${item.phone} salva em ${percent}% (${perThousand} por mil visitas futuras). ${result.notificationSent ? "Aviso enviado à comunidade do WhatsApp." : "Não foi possível enviar o aviso ao grupo."}`,
+            !result.unchanged && !result.notificationSent);
+        } catch (error) { say(el("admin-load-message"), error.message, true); }
+        finally { saveRate.disabled = false; }
+      });
+      actionCell.append(saveRate); row.append(actionCell); usersBody.append(row);
+    }
     const linksBody = el("admin-links-body"); linksBody.replaceChildren();
     for (const item of data.links || []) {
       const row = document.createElement("tr");
