@@ -31,7 +31,6 @@
     frame.height = String(height);
     frame.loading = "lazy";
     frame.referrerPolicy = "strict-origin-when-cross-origin";
-    frame.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms");
     const key = String(slot.key).toLowerCase();
     const host = String(slot.host).toLowerCase();
     const scriptPath = String(slot.scriptPath || (host === "bauval.org" ? `/22/${key}` : `/${key}/invoke.js`));
