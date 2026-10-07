@@ -217,6 +217,11 @@
       const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
       cell(row, Number(item.click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
     }
+    const adConfiguration = data.adConfiguration || { adsenseEnabled: false, slots: [] };
+    el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);
+    for (let index = 0; index < 6; index++) {
+      el(`banner-code-${index + 1}`).value = adConfiguration.slots?.[index]?.script || "";
+    }
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
   }
 
@@ -350,6 +355,25 @@
   });
 
   el("refresh-admin")?.addEventListener("click", () => refreshAdmin().catch((error) => window.alert(error.message)));
+
+  el("ad-config-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    say(el("ad-config-message"), "Validando e salvando as configurações…");
+    try {
+      const result = await api("admin-save-ad-configuration", {
+        adsenseEnabled: el("adsense-primary").checked,
+        adScripts: Array.from({ length: 6 }, (_, index) => el(`banner-code-${index + 1}`).value)
+      });
+      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) na página Guia. O redirecionamento permanece sem anúncios e sem espera.`);
+      await refreshAdmin();
+    } catch (error) {
+      say(el("ad-config-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
 
   el("prelogin-link-form")?.addEventListener("submit", (event) => {
     event.preventDefault();

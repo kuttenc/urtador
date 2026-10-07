@@ -31,8 +31,8 @@ jobs:
         shell: bash
         run: |
           mkdir -p _site/assets
-          cp index.html sobre.html privacidade.html termos.html 404.html .nojekyll _site/
-          cp assets/app.js assets/config.js assets/redirect.js assets/styles.css assets/urtador-login-art.jpeg _site/assets/
+          cp index.html guia.html sobre.html privacidade.html termos.html 404.html .nojekyll _site/
+          cp assets/app.js assets/config.js assets/content-ads.js assets/redirect.js assets/styles.css assets/urtador-login-art.jpeg _site/assets/
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

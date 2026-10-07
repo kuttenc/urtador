@@ -33,7 +33,7 @@ Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto 
 npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
-As migrações SQL `202610050001` e `202610050002` criam as tabelas e políticas necessárias. A segunda migração também foi aplicada diretamente ao banco de produção; ela é aditiva e pode ser repetida pelo CLI para sincronizar o histórico de migrações.
+As migrações SQL criam as tabelas e políticas necessárias. A migração `202610070001` adiciona a configuração administrativa de publicidade; ela deve ser aplicada antes de publicar a Edge Function atualizada.
 
 ## Acesso e pagamentos
 
@@ -41,7 +41,10 @@ No primeiro acesso, um código de seis dígitos enviado pelo WhatsApp confirma o
 
 O painel calcula R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Essa regra deve ser mantida separada de impressões/cliques do Google AdSense; a página de redirecionamento não carrega código AdSense.
 
+## Anúncios
+
+O administrador configura Auto ads do AdSense e até seis banners Adsterra no painel. Os anúncios são exibidos somente na página de conteúdo `guia.html`; as etapas de redirecionamento não têm anúncios, temporizadores ou bloqueios. Banners Adsterra são aceitos apenas como configuração validada de chave, tamanho e host permitido; scripts arbitrários não são executados.
+
 ## Teste local
 
 Abra `index.html` diretamente no navegador ou sirva a pasta com qualquer servidor estatico.
-

@@ -11,6 +11,8 @@ type Payload = {
   title?: string;
   pixKey?: string;
   withdrawalId?: string;
+  adsenseEnabled?: boolean;
+  adScripts?: unknown[];
   status?: "approved" | "paid" | "rejected";
   note?: string;
 };
@@ -98,6 +100,39 @@ function normalizeUrl(input?: string) {
   const parsed = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
   if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname.includes(".")) throw new Error("O endereço precisa ser HTTP ou HTTPS válido.");
   return parsed.toString();
+}
+
+function parseAdsterraBanner(input: unknown, index: number) {
+  const source = String(input ?? "").trim();
+  if (!source) return null;
+  if (source.length > 12000) throw new Error(`O código do anúncio ${index} excede o limite de 12 mil caracteres.`);
+  const keyMatch = source.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{32})['"]/i);
+  const widthMatch = source.match(/['"]width['"]\s*:\s*(\d{2,4})/i);
+  const heightMatch = source.match(/['"]height['"]\s*:\s*(\d{2,4})/i);
+  const scriptMatch = source.match(/<script\b[^>]*\bsrc\s*=\s*['"](https:\/\/[^'"]+)['"][^>]*>\s*<\/script>/i);
+  if (!keyMatch || !widthMatch || !heightMatch || !scriptMatch) {
+    throw new Error(`O anúncio ${index} não parece um código de banner Adsterra válido. Cole o código original do painel Publisher.`);
+  }
+  const key = keyMatch[1].toLowerCase();
+  const width = Number(widthMatch[1]);
+  const height = Number(heightMatch[1]);
+  let scriptUrl: URL;
+  try { scriptUrl = new URL(scriptMatch[1]); } catch { throw new Error(`A URL do script do anúncio ${index} é inválida.`); }
+  const allowedHosts = new Set(["www.highperformanceformat.com", "highperformanceformat.com"]);
+  const pathMatch = scriptUrl.pathname.match(/^\/([a-f0-9]{32})\/invoke\.js$/i);
+  if (scriptUrl.protocol !== "https:" || !allowedHosts.has(scriptUrl.hostname.toLowerCase()) || pathMatch?.[1].toLowerCase() !== key) {
+    throw new Error(`O anúncio ${index} usa uma origem não reconhecida. Use o código gerado para seu site no painel oficial Adsterra.`);
+  }
+  if (width < 120 || width > 728 || height < 50 || height > 600) throw new Error(`As dimensões do anúncio ${index} estão fora do limite permitido.`);
+  return { key, width, height, host: scriptUrl.hostname.toLowerCase() };
+}
+
+function formatAdsterraBanner(slot: Record<string, unknown>) {
+  const key = String(slot.key);
+  const width = Number(slot.width);
+  const height = Number(slot.height);
+  const host = String(slot.host);
+  return `<script type="text/javascript">\natOptions = {\n  'key': '${key}',\n  'format': 'iframe',\n  'height': ${height},\n  'width': ${width},\n  'params': {}\n};\n</script>\n<script type="text/javascript" src="https://${host}/${key}/invoke.js"></script>`;
 }
 
 function bearer(request: Request) {
@@ -396,17 +431,48 @@ function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<stri
   };
 }
 
+async function readAdConfiguration() {
+  const { data, error } = await supabase.from("kutt_ad_configuration")
+    .select("adsense_enabled, adsterra_slots").eq("id", true).maybeSingle();
+  if (error) throw error;
+  const slots = Array.isArray(data?.adsterra_slots) ? data.adsterra_slots : [];
+  return {
+    adsenseEnabled: Boolean(data?.adsense_enabled),
+    slots: slots.map((slot: Record<string, unknown>) => ({ ...slot, script: formatAdsterraBanner(slot) }))
+  };
+}
+
+async function publicAdConfiguration() {
+  const config = await readAdConfiguration();
+  return { adsenseEnabled: config.adsenseEnabled, slots: config.slots };
+}
+
 async function adminAction(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   if (user.role !== "admin" || !adminPhones.has(user.phone)) throw new Error("Acesso restrito ao administrador.");
   if (payload.action === "admin-list") {
-    const [users, withdrawals, links, visits] = await Promise.all([
+    const [users, withdrawals, links, visits, adConfiguration] = await Promise.all([
       readAllRows("kutt_users", "id, phone, role, pix_key, created_at", "created_at"),
       readAllRows("kutt_withdrawals", "id, user_id, amount_cents, pix_key, status, requested_at, processed_at, admin_note, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at"),
       readAllRows("kutt_short_links", "id, slug, target_url, title, click_count, created_at, owner_user_id, user:kutt_users!kutt_short_links_owner_user_id_fkey(phone)", "created_at"),
-      readAllRows("kutt_reward_visits", "owner_user_id, visit_day", "visit_day")
+      readAllRows("kutt_reward_visits", "owner_user_id, visit_day", "visit_day"),
+      readAdConfiguration()
     ]);
-    return { users, withdrawals, links, summary: makeAdminSummary(users, withdrawals, links, visits) };
+    return { users, withdrawals, links, adConfiguration, summary: makeAdminSummary(users, withdrawals, links, visits) };
+  }
+  if (payload.action === "admin-save-ad-configuration") {
+    if (typeof payload.adsenseEnabled !== "boolean") throw new Error("Informe se o AdSense está habilitado.");
+    if (!Array.isArray(payload.adScripts) || payload.adScripts.length !== 6) throw new Error("Envie os seis campos de banner, mesmo que alguns estejam vazios.");
+    const slots = payload.adScripts.map((script, index) => parseAdsterraBanner(script, index + 1)).filter(Boolean);
+    const { error } = await supabase.from("kutt_ad_configuration").upsert({
+      id: true,
+      adsense_enabled: payload.adsenseEnabled,
+      adsterra_slots: slots,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id
+    }, { onConflict: "id" });
+    if (error) throw error;
+    return { ok: true, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, slots } };
   }
   if (payload.action === "admin-withdrawal") {
     const status = payload.status;
@@ -441,8 +507,10 @@ Deno.serve(async (request) => {
       case "save-pix": return json(request, 200, await setPix(request, payload));
       case "withdraw": return json(request, 200, await requestWithdrawal(request, payload));
       case "logout": return json(request, 200, await logout(request, payload));
+      case "public-ad-configuration": return json(request, 200, await publicAdConfiguration());
       case "admin-list":
-      case "admin-withdrawal": return json(request, 200, await adminAction(request, payload));
+      case "admin-withdrawal":
+      case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));
       default: return json(request, 400, { error: "Ação inválida." });
     }
   } catch (error) {
