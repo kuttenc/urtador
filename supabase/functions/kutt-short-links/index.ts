@@ -589,13 +589,11 @@ async function adminAction(request: Request, payload: Payload) {
       updated_by: user.id
     }, { onConflict: "id" });
     if (error) throw error;
-    const activeProviders = [
-      ...(slots.length ? [`Adsterra (${slots.map((slot) => slot.title).join(", ")})`] : []),
-      ...(payload.adsenseEnabled ? [`Google AdSense (${adsenseTitle}; aguardando aprovação antes de ativar na página)`] : [])
-    ];
-    const ownerSummary = slots.length ? `Titularidade configurada: você ${slots.filter((slot) => slot.owner === "owner").length}, Matheus ${slots.filter((slot) => slot.owner === "mateus").length}.` : "Nenhum banner Adsterra ativo.";
-    const notified = activeProviders.length
-      ? await notifyCollaboratorGroup(`✅ Atualização de anúncios salva no Urtador. Fornecedor(es) configurado(s): ${activeProviders.join("; ")}. ${ownerSummary} Os anúncios são exibidos somente na página Guia. Google AdSense: ${payload.adsenseEnabled ? "marcado como habilitado" : "desligado"}; a veiculação depende da aprovação do site.`)
+    const fabioBanners = slots.filter((slot) => slot.owner === "owner").length;
+    const mateusBanners = slots.filter((slot) => slot.owner === "mateus").length;
+    const bannerLabel = (count: number) => `${count} ${count === 1 ? "banner" : "banners"}`;
+    const notified = slots.length || payload.adsenseEnabled
+      ? await notifyCollaboratorGroup(`✅ Anúncios atualizados\nFabio: ${bannerLabel(fabioBanners)}\nMatheus: ${bannerLabel(mateusBanners)}\nPágina: Guia`)
       : false;
     return { ok: true, notificationSent: notified, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, adsenseTitle, rewardBaseCents: await currentRewardBaseCents(), slots } };
   }

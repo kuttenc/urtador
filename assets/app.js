@@ -12,6 +12,11 @@
     data: null,
     activeDashboardPage: ""
   };
+  const starterAdsterraBanner = {
+    title: "Adsterra Beta 300x250",
+    owner: "owner",
+    script: `<script>\n  atOptions = {\n    'key' : '02033b78716daab542298321e0a8d3a6',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src="https://bauval.org/22/02033b78716daab542298321e0a8d3a6"></script>`
+  };
   const el = (id) => document.getElementById(id);
 
   function say(node, text, error = false) {
@@ -260,17 +265,30 @@
       } else actions.textContent = "—";
       row.append(actions); withdrawalsBody.append(row);
     }
+    const adConfiguration = data.adConfiguration || { adsenseEnabled: false, rewardBaseCents: 7000, slots: [] };
+    const rewardBaseCents = Number(adConfiguration.rewardBaseCents ?? 7000);
     const usersBody = el("admin-users-body"); usersBody.replaceChildren();
     for (const item of data.users || []) {
       const row = document.createElement("tr");
-      cell(row, item.phone); cell(row, item.role); cell(row, item.pix_key || "—"); cell(row, date(item.created_at));
-      const rateCell = document.createElement("td");
+      const accountCell = document.createElement("td"); accountCell.className = "admin-user-account";
+      const phone = document.createElement("strong"); phone.textContent = item.phone || "Telefone não informado";
+      const details = document.createElement("small"); details.className = "admin-user-details";
+      details.textContent = `${item.role === "admin" ? "Administrador" : "Colaborador"} · Cadastro ${date(item.created_at)} · Pix: ${item.pix_key || "não cadastrada"}`;
+      accountCell.append(phone, details); row.append(accountCell);
+      const rateCell = document.createElement("td"); rateCell.className = "admin-user-rate-cell";
+      const rateControl = document.createElement("div"); rateControl.className = "admin-user-rate-control";
       const rateInput = document.createElement("input");
       rateInput.className = "rate-input"; rateInput.type = "number"; rateInput.min = "0"; rateInput.max = "100"; rateInput.step = "0.01";
       rateInput.value = String(Number(item.payout_percent ?? 100)); rateInput.setAttribute("aria-label", `Percentual do valor-base para ${item.phone}`);
-      rateCell.append(rateInput); row.append(rateCell);
+      const rateSuffix = document.createElement("span"); rateSuffix.textContent = "%";
+      rateControl.append(rateInput, rateSuffix);
+      const estimatedRate = document.createElement("small"); estimatedRate.className = "admin-user-estimate";
+      const updateEstimate = () => { estimatedRate.textContent = `${money(Math.round(rewardBaseCents * (Number(rateInput.value) || 0) / 100))} por 1.000 visitas`; };
+      rateInput.addEventListener("input", updateEstimate); updateEstimate();
+      rateCell.append(rateControl, estimatedRate); row.append(rateCell);
       const actionCell = document.createElement("td");
-      const saveRate = document.createElement("button"); saveRate.className = "button small"; saveRate.type = "button"; saveRate.textContent = "Salvar";
+      actionCell.className = "admin-user-action";
+      const saveRate = document.createElement("button"); saveRate.className = "button small"; saveRate.type = "button"; saveRate.textContent = "Salvar taxa";
       saveRate.addEventListener("click", async () => {
         saveRate.disabled = true;
         try {
@@ -296,19 +314,25 @@
       const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
       cell(row, Number(item.click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
     }
-    const adConfiguration = data.adConfiguration || { adsenseEnabled: false, rewardBaseCents: 7000, slots: [] };
     el("reward-base-value").value = (Number(adConfiguration.rewardBaseCents ?? 7000) / 100).toFixed(2);
     el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);
     el("adsense-title").value = adConfiguration.adsenseTitle || "";
+    const savedSlots = Array.isArray(adConfiguration.slots) ? adConfiguration.slots : [];
+    const slotsForForm = savedSlots.length ? savedSlots : [starterAdsterraBanner];
     const ownerCounts = { owner: 0, mateus: 0, missing: 0 };
     for (let index = 0; index < 6; index++) {
-      el(`banner-title-${index + 1}`).value = adConfiguration.slots?.[index]?.title || "";
-      el(`banner-code-${index + 1}`).value = adConfiguration.slots?.[index]?.script || "";
-      const owner = adConfiguration.slots?.[index]?.owner || "";
+      const slot = slotsForForm[index];
+      el(`banner-title-${index + 1}`).value = slot?.title || "";
+      el(`banner-code-${index + 1}`).value = slot?.script || "";
+      const owner = slot?.owner || "";
       el(`banner-owner-${index + 1}`).value = owner;
-      if (adConfiguration.slots?.[index]) ownerCounts[owner === "owner" || owner === "mateus" ? owner : "missing"]++;
+      if (savedSlots[index]) {
+        const savedOwner = savedSlots[index].owner || "";
+        ownerCounts[savedOwner === "owner" || savedOwner === "mateus" ? savedOwner : "missing"]++;
+      }
     }
-    el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: você ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
+    el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: Fabio ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
+    say(el("ad-config-message"), savedSlots.length ? "" : "O banner Adsterra Beta do Fabio está preenchido como rascunho. Clique em Salvar anúncios para ativá-lo.");
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
   }
 

@@ -54,12 +54,12 @@
     const response = await fetch(apiUrl, { method: "POST", headers, body: JSON.stringify({ action: "public-ad-configuration" }) });
     if (!response.ok) return;
     const data = await response.json();
-    if (data.adsenseEnabled) addAdsenseLoader();
     const banners = (Array.isArray(data.slots) ? data.slots : []).filter(isValidBanner);
+    if (data.adsenseEnabled && !banners.length) addAdsenseLoader();
     if (banners.length) {
       // Rotate through the saved units by UTC day; show at most three well-spaced banners per guide visit.
       const first = Math.floor(Date.now() / 86400000) % banners.length;
-      const placements = [2, 4, 6];
+      const placements = [1, 3, 5];
       placements.slice(0, Math.min(3, banners.length)).forEach((placement, index) => {
         renderBanner(banners[(first + index) % banners.length], placement);
       });
