@@ -534,7 +534,6 @@ th { color: #91a8c6; }
 
 .redirect-promo a { color: #55e9b0; font-weight: 800; }
 .redirect-note { margin: 12px 0; color: #b9c7d8; font-size: .9rem; }
-.redirect-countdown { margin: 18px 0; color: #55e9b0; font-weight: 800; font-variant-numeric: tabular-nums; }
 .redirect-continue {
   display: inline-flex;
   margin-top: 12px;

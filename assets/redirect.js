@@ -18,30 +18,7 @@
     steps.forEach((step) => { step.hidden = step.dataset.redirectStep !== String(number); });
   }
 
-  function startCountdown(stepNumber, button) {
-    const secondsTotal = 20;
-    const counter = document.querySelector(`[data-redirect-countdown="${stepNumber}"]`);
-    let remaining = secondsTotal;
-    button.disabled = true;
-    const update = () => {
-      if (counter) counter.textContent = remaining > 0 ? `Aguarde ${remaining} segundos` : "Etapa concluída";
-      button.textContent = remaining > 0
-        ? `${stepNumber === 1 ? "Próxima etapa" : "Abrir destino"} (${remaining})`
-        : stepNumber === 1 ? "Próxima etapa" : "Abrir destino";
-      if (remaining <= 0) {
-        button.disabled = false;
-        return;
-      }
-      remaining -= 1;
-      window.setTimeout(update, 1000);
-    };
-    update();
-  }
-
-  reviewButton?.addEventListener("click", () => {
-    showStep(2);
-    if (openButton) startCountdown(2, openButton);
-  });
+  reviewButton?.addEventListener("click", () => showStep(2));
   openButton?.addEventListener("click", async () => {
     if (openButton.disabled) return;
     openButton.disabled = true;
@@ -71,5 +48,4 @@
   }
 
   write("O destino só será solicitado ao confirmar a abertura.");
-  if (reviewButton) startCountdown(1, reviewButton);
 })();
