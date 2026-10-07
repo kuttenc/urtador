@@ -77,11 +77,14 @@
       throw new Error("Cole o código completo do banner gerado no painel Publisher.");
     }
     const parsed = new URL(sourceUrl);
-    const allowedHosts = new Set(["www.highperformanceformat.com", "highperformanceformat.com"]);
-    if (parsed.protocol !== "https:" || !allowedHosts.has(parsed.hostname.toLowerCase()) || parsed.pathname.toLowerCase() !== `/${key}/invoke.js`) {
+    const host = parsed.hostname.toLowerCase();
+    const validPath = host === "bauval.org"
+      ? parsed.pathname.toLowerCase() === `/22/${key}`
+      : new Set(["www.highperformanceformat.com", "highperformanceformat.com"]).has(host) && parsed.pathname.toLowerCase() === `/${key}/invoke.js`;
+    if (parsed.protocol !== "https:" || parsed.username || parsed.password || parsed.port || parsed.search || parsed.hash || !validPath) {
       throw new Error("Este código usa um endereço de script não permitido. Cole o snippet oficial validado pelo painel.");
     }
-    return { key, width, height, host: parsed.hostname.toLowerCase() };
+    return { key, width, height, host, scriptPath: parsed.pathname };
   }
 
   function showAdPreview(index) {

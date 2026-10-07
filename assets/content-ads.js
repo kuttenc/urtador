@@ -16,7 +16,12 @@
 
   function isValidBanner(slot) {
     if (!/^[a-f0-9]{32}$/i.test(String(slot.key || ""))) return false;
-    if (!new Set(["www.highperformanceformat.com", "highperformanceformat.com"]).has(String(slot.host || "").toLowerCase())) return false;
+    const host = String(slot.host || "").toLowerCase();
+    const scriptPath = String(slot.scriptPath || (host.endsWith("highperformanceformat.com") ? `/${slot.key}/invoke.js` : `/22/${slot.key}`));
+    const validPath = host === "bauval.org"
+      ? scriptPath === `/22/${slot.key}`
+      : new Set(["www.highperformanceformat.com", "highperformanceformat.com"]).has(host) && scriptPath === `/${slot.key}/invoke.js`;
+    if (!validPath) return false;
     const width = Number(slot.width);
     const height = Number(slot.height);
     return Number.isInteger(width) && Number.isInteger(height) && width >= 120 && width <= 728 && height >= 50 && height <= 600;
@@ -39,7 +44,8 @@
     frame.setAttribute("sandbox", "allow-scripts allow-popups allow-popups-to-escape-sandbox allow-forms");
     const key = String(slot.key).toLowerCase();
     const host = String(slot.host).toLowerCase();
-    frame.srcdoc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}body{display:grid;place-items:center}</style></head><body><script>var atOptions={key:"${key}",format:"iframe",height:${height},width:${width},params:{}};<\/script><script src="https://${host}/${key}/invoke.js"><\/script></body></html>`;
+    const scriptPath = String(slot.scriptPath || (host === "bauval.org" ? `/22/${key}` : `/${key}/invoke.js`));
+    frame.srcdoc = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent}body{display:grid;place-items:center}</style></head><body><script>var atOptions={key:"${key}",format:"iframe",height:${height},width:${width},params:{}};<\/script><script src="https://${host}${scriptPath}"><\/script></body></html>`;
     container.replaceChildren(heading, frame);
     container.hidden = false;
   }

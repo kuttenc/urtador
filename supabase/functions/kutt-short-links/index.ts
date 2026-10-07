@@ -24,8 +24,11 @@ type Payload = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const publicBaseUrl = (Deno.env.get("PUBLIC_BASE_URL") ?? "https://kuttenc.github.io/urtador").replace(/\/$/, "");
-const ownerPhone = normalizePhone(Deno.env.get("OWNER_PHONE") ?? "11989346164");
-const adminPhones = new Set([ownerPhone, "12996629929", ...(Deno.env.get("ADMIN_PHONES") ?? "").split(",").map((phone) => phone.trim()).filter(Boolean).map(normalizePhone)]);
+const ownerPhoneValue = Deno.env.get("OWNER_PHONE")?.trim() ?? "";
+const adminPhones = new Set([
+  ...(ownerPhoneValue ? [normalizePhone(ownerPhoneValue)] : []),
+  ...(Deno.env.get("ADMIN_PHONES") ?? "").split(",").map((phone) => phone.trim()).filter(Boolean).map(normalizePhone)
+]);
 const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
 const greenApiUrl = (Deno.env.get("GREEN_API_URL") ?? "").replace(/\/$/, "");
 const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID") ?? "";
@@ -128,13 +131,16 @@ function parseAdsterraBanner(input: unknown, index: number) {
   const height = Number(heightMatch[1]);
   let scriptUrl: URL;
   try { scriptUrl = new URL(scriptMatch[1]); } catch { throw new Error(`A URL do script do anúncio ${index} é inválida.`); }
-  const allowedHosts = new Set(["www.highperformanceformat.com", "highperformanceformat.com"]);
-  const pathMatch = scriptUrl.pathname.match(/^\/([a-f0-9]{32})\/invoke\.js$/i);
-  if (scriptUrl.protocol !== "https:" || !allowedHosts.has(scriptUrl.hostname.toLowerCase()) || pathMatch?.[1].toLowerCase() !== key) {
+  const host = scriptUrl.hostname.toLowerCase();
+  const pathMatch = host === "bauval.org"
+    ? scriptUrl.pathname.match(/^\/22\/([a-f0-9]{32})$/i)
+    : scriptUrl.pathname.match(/^\/([a-f0-9]{32})\/invoke\.js$/i);
+  const allowedHost = host === "bauval.org" || host === "www.highperformanceformat.com" || host === "highperformanceformat.com";
+  if (scriptUrl.protocol !== "https:" || !allowedHost || scriptUrl.username || scriptUrl.password || scriptUrl.port || scriptUrl.search || scriptUrl.hash || pathMatch?.[1].toLowerCase() !== key) {
     throw new Error(`O anúncio ${index} usa uma origem não reconhecida. Use o código gerado para seu site no painel oficial Adsterra.`);
   }
   if (width < 120 || width > 728 || height < 50 || height > 600) throw new Error(`As dimensões do anúncio ${index} estão fora do limite permitido.`);
-  return { title, owner, key, width, height, host: scriptUrl.hostname.toLowerCase() };
+  return { title, owner, key, width, height, host, scriptPath: scriptUrl.pathname };
 }
 
 function formatAdsterraBanner(slot: Record<string, unknown>) {
@@ -142,7 +148,10 @@ function formatAdsterraBanner(slot: Record<string, unknown>) {
   const width = Number(slot.width);
   const height = Number(slot.height);
   const host = String(slot.host);
-  return `<script type="text/javascript">\natOptions = {\n  'key': '${key}',\n  'format': 'iframe',\n  'height': ${height},\n  'width': ${width},\n  'params': {}\n};\n</script>\n<script type="text/javascript" src="https://${host}/${key}/invoke.js"></script>`;
+  const scriptPath = String(slot.scriptPath ?? (host.endsWith("highperformanceformat.com") ? `/${key}/invoke.js` : `/22/${key}`));
+  const expectedPath = host === "bauval.org" ? `/22/${key}` : `/${key}/invoke.js`;
+  if (scriptPath !== expectedPath) throw new Error("O caminho do script do anúncio salvo não é válido.");
+  return `<script type="text/javascript">\natOptions = {\n  'key': '${key}',\n  'format': 'iframe',\n  'height': ${height},\n  'width': ${width},\n  'params': {}\n};\n</script>\n<script type="text/javascript" src="https://${host}${scriptPath}"></script>`;
 }
 
 function bearer(request: Request) {

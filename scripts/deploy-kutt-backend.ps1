@@ -3,7 +3,6 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $workspaceRoot = Split-Path -Parent $repoRoot
 $kuttEnvPath = Join-Path $workspaceRoot '.envkutt'
-$appEnvPath = Join-Path $workspaceRoot '.env'
 $projectRef = 'ggufcvrwctieacvbbwim'
 
 function Read-EnvFile([string]$path) {
@@ -18,7 +17,6 @@ function Read-EnvFile([string]$path) {
 }
 
 $kutt = Read-EnvFile $kuttEnvPath
-$app = Read-EnvFile $appEnvPath
 if (-not $kutt['KUTT_SUPABASE_ACCESS_TOKEN']) {
   throw 'Adicione KUTT_SUPABASE_ACCESS_TOKEN ao .envkutt usando um Access Token da conta Supabase que tem acesso ao projeto Kutt. Não envie esse token no chat.'
 }
@@ -26,10 +24,6 @@ foreach ($name in @('DB_PASSWORD')) {
   if (-not $kutt[$name]) { throw "O .envkutt precisa conter $name." }
 }
 if (-not $kutt['ADMIN_PHONES']) { throw 'Configure ADMIN_PHONES no .envkutt com os telefones administradores em formato internacional, separados por vírgula.' }
-foreach ($name in @('GREEN_API_URL', 'GREEN_API_INSTANCE_ID', 'GREEN_API_TOKEN')) {
-  if (-not $app[$name]) { throw "O .env local precisa conter $name para enviar os códigos de WhatsApp." }
-}
-
 if (-not $kutt['OTP_PEPPER']) {
   $randomBytes = New-Object byte[] 32
   [System.Security.Cryptography.RandomNumberGenerator]::Fill($randomBytes)
@@ -42,16 +36,21 @@ $env:SUPABASE_ACCESS_TOKEN = $kutt['KUTT_SUPABASE_ACCESS_TOKEN']
 $secretFile = Join-Path $repoRoot 'supabase\.temp\kutt-secrets.local.env'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $secretFile) | Out-Null
 $secretLines = @(
-  "GREEN_API_URL=$($app['GREEN_API_URL'])",
-  "GREEN_API_INSTANCE_ID=$($app['GREEN_API_INSTANCE_ID'])",
-  "GREEN_API_TOKEN=$($app['GREEN_API_TOKEN'])",
-  'OWNER_PHONE=5511989346164',
-  'KUTT_AD_NOTIFICATION_GROUP_ID=120363430513969812',
   "ADMIN_PHONES=$($kutt['ADMIN_PHONES'])",
   "OTP_PEPPER=$($kutt['OTP_PEPPER'])",
   'PUBLIC_BASE_URL=https://kuttenc.github.io/urtador',
   'ALLOWED_ORIGINS=https://kuttenc.github.io'
 )
+if ($kutt['OWNER_PHONE']) { $secretLines += "OWNER_PHONE=$($kutt['OWNER_PHONE'])" }
+if ($kutt['KUTT_AD_NOTIFICATION_GROUP_ID']) { $secretLines += "KUTT_AD_NOTIFICATION_GROUP_ID=$($kutt['KUTT_AD_NOTIFICATION_GROUP_ID'])" }
+$greenApiNames = @('GREEN_API_URL', 'GREEN_API_INSTANCE_ID', 'GREEN_API_TOKEN')
+$configuredGreenApiNames = @($greenApiNames | Where-Object { $kutt[$_] })
+if ($configuredGreenApiNames.Count -gt 0 -and $configuredGreenApiNames.Count -ne $greenApiNames.Count) {
+  throw 'Configure as três variáveis GREEN_API_* no .envkutt ou deixe todas ausentes para preservar a conexão já configurada no Supabase.'
+}
+if ($configuredGreenApiNames.Count -eq $greenApiNames.Count) {
+  foreach ($name in $greenApiNames) { $secretLines += "$name=$($kutt[$name])" }
+}
 [System.IO.File]::WriteAllLines($secretFile, $secretLines, [System.Text.UTF8Encoding]::new($false))
 
 try {
