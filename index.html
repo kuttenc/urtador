@@ -63,10 +63,11 @@
               </form>
               <p class="message" id="auth-message" aria-live="polite"></p>
               <form id="prelogin-link-form" class="prelogin-link-form">
-                <h3>Já tem o endereço que quer encurtar?</h3>
-                <p class="field-help">Cole primeiro. Vamos guardar o endereço neste navegador enquanto você entra ou confirma seu WhatsApp.</p>
+                <h3>Encurte sem cadastro</h3>
+                <p class="field-help">Crie e compartilhe seu link agora. Se entrar depois neste mesmo navegador, o link será anexado à sua conta.</p>
                 <div class="field"><label for="pending-url">Endereço do link</label><input id="pending-url" name="url" type="url" inputmode="url" placeholder="https://exemplo.com/pagina" autocomplete="url" required></div>
-                <button class="button secondary" type="submit">Guardar e continuar</button>
+                <button class="button" type="submit">Encurtar link</button>
+                <div class="guest-link-output" id="guest-link-output" hidden><a id="guest-link-result" rel="noopener noreferrer"></a><button class="button secondary small" id="copy-guest-link" type="button">Copiar link</button></div>
                 <p class="message" id="draft-message" aria-live="polite"></p>
               </form>
               <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação do WhatsApp; depois, pediremos senha e código novamente.</small>
@@ -153,6 +154,25 @@
                     <h4>Atividade registrada — últimos 14 dias</h4>
                     <p class="field-help">Visitas e solicitações vêm dos registros do Supabase. “Pix em aberto” soma solicitações aguardando conferência ou pagamento; não é uma previsão de receita de anúncios.</p>
                     <div class="table-wrap"><table><thead><tr><th>Data</th><th>Visitas qualificadas</th><th>Solicitações Pix · total</th><th>Pix em aberto</th><th>Pix pagos</th></tr></thead><tbody id="admin-daily-body"></tbody></table></div>
+                    <h4>Relatório de repasses</h4>
+                    <p class="field-help">Consulte por dia, semana ou mês. “Repasse estimado” segue a regra interna registrada por visita; “Pix pagos” soma somente pagamentos marcados como realizados no painel. Isso não é receita real do Adsterra ou do AdSense.</p>
+                    <form id="admin-report-form" class="ad-config-form">
+                      <div class="ad-code-grid admin-report-filters">
+                        <label class="field"><span>De</span><input id="report-start" type="date" required></label>
+                        <label class="field"><span>Até</span><input id="report-end" type="date" required></label>
+                        <label class="field"><span>Agrupar por</span><select id="report-group"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mês</option></select></label>
+                      </div>
+                      <button class="button" type="submit">Gerar relatório</button>
+                      <button class="button secondary" id="export-admin-report" type="button" disabled>Baixar CSV</button>
+                      <p id="admin-report-message" class="message" aria-live="polite"></p>
+                    </form>
+                    <div class="balance-grid admin-summary-grid" id="admin-report-totals" hidden>
+                      <article class="balance-card"><span>Visitas qualificadas</span><strong id="report-visits">0</strong></article>
+                      <article class="balance-card"><span>Repasse estimado</span><strong id="report-estimated">R$ 0,00</strong></article>
+                      <article class="balance-card"><span>Pix pagos</span><strong id="report-paid">R$ 0,00</strong></article>
+                      <article class="balance-card"><span>Pix em aberto</span><strong id="report-open">R$ 0,00</strong></article>
+                    </div>
+                    <div class="table-wrap"><table><thead><tr><th>Período</th><th>Gerador</th><th>Visitas qualificadas</th><th>Repasse estimado</th><th>Pix pagos</th><th>Pix em aberto</th></tr></thead><tbody id="admin-report-body"></tbody></table></div>
                     <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
                     <h4>Valor-base interno por mil visitas</h4><p class="field-help">Este é o valor de repasse do Urtador para visitas qualificadas; não é o CPM nem a receita real de anúncios. A mudança vale para visitas futuras. Cada registro guarda o valor vigente na data.</p>
                     <form id="reward-base-form" class="ad-config-form"><label class="field"><span>Valor-base (R$ por 1.000 visitas qualificadas)</span><input id="reward-base-value" type="number" min="0" max="500" step="0.01" required></label><button class="button" type="submit">Salvar valor-base</button><p id="reward-base-message" class="message" aria-live="polite"></p></form>

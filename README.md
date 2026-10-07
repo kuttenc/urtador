@@ -37,11 +37,15 @@ npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctie
 
 As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001`–`202610070004` adicionam configuração de anúncios, taxas individuais de repasse e recuperação segura de senha; aplique-as antes de publicar a Edge Function atualizada.
 
+Links podem ser criados sem cadastro. Um identificador aleatório do navegador é guardado localmente; depois do login no mesmo navegador, a função anexa os links anônimos à conta. O backend guarda somente o hash desse identificador e o hash do IP de criação (para prevenção de abuso); não usa o IP para identificar a conta. A migração `202610070006_guest_link_sessions.sql` adiciona o campo necessário.
+
 ## Acesso e pagamentos
 
 No primeiro acesso, um código de seis dígitos enviado pelo WhatsApp confirma o telefone e libera o cadastro de senha. A senha é armazenada como hash PBKDF2-SHA-256 com salt aleatório, nunca em texto aberto. Nos 48 horas após cada verificação do WhatsApp, a senha permite iniciar uma nova sessão; após esse prazo, a senha continua obrigatória e o sistema envia um novo código ao WhatsApp. Cada sessão expira em três horas. Os telefones em `OWNER_PHONE` e `ADMIN_PHONES` definem os administradores; esses números ficam nos secrets do Supabase, não no repositório público. Usuários comuns só veem os próprios links, cadastram a própria chave Pix e solicitam saque. O administrador confere a solicitação, aprova, faz o Pix por fora e marca como pago no painel.
 
 O valor-base é R$ 70 por mil visitas qualificadas e únicas por usuário, deduplicadas por IP e dia, excluindo robôs e o IP de criação do link. Administradores podem ajustar de 0% a 100% do valor-base para cada conta. A nova taxa é registrada em cada nova visita elegível; visitas anteriores mantêm a taxa que tinham. Isso não é o CPM real nem a receita de anúncios do Google AdSense.
+
+O painel administrativo também gera relatórios por período e agrupamento diário, semanal ou mensal. Mostra a estimativa interna de repasse pelas visitas registradas, os Pix que administradores marcaram como pagos e os pedidos ainda em aberto, com exportação CSV. Esses números não são receita confirmada dos fornecedores de anúncios.
 
 ## Anúncios
 

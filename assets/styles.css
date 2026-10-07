@@ -461,6 +461,9 @@ td a { color:var(--brand-strong); overflow-wrap:anywhere; }
 }
 .prelogin-link-form h3 { margin: 0 0 8px; font-size: 18px; }
 .prelogin-link-form > .field-help { display: block; margin: 0 0 14px; line-height: 1.55; }
+.guest-link-output { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid rgba(20, 220, 160, .25); border-radius: 10px; overflow-wrap: anywhere; }
+.guest-link-output a { color: #24e5ae; font-weight: 700; }
+.admin-report-filters { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
 .balance-card { border-color: rgba(116, 160, 219, .2); background: #0b192b; }
 th, td { border-bottom-color: rgba(116, 160, 219, .15); }
 th { color: #91a8c6; }

@@ -8,6 +8,8 @@
     passwordSetupRequired: storage.getItem("urtador-password-setup") === "1",
     passwordRecovery: storage.getItem("urtador-password-recovery") === "1",
     resumingDraft: false,
+    guestClaimedToken: "",
+    adminReportRows: [],
     user: null,
     data: null,
     activeDashboardPage: ""
@@ -18,6 +20,15 @@
     script: `<script>\n  atOptions = {\n    'key' : '02033b78716daab542298321e0a8d3a6',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src="https://bauval.org/22/02033b78716daab542298321e0a8d3a6"></script>`
   };
   const el = (id) => document.getElementById(id);
+
+  function guestSessionId() {
+    let id = storage.getItem("urtador-guest-session");
+    if (!id) {
+      id = crypto.randomUUID();
+      storage.setItem("urtador-guest-session", id);
+    }
+    return id;
+  }
 
   function say(node, text, error = false) {
     if (!node) return;
@@ -158,7 +169,17 @@
   }
 
   async function refreshDashboard() {
-    const data = await api("me");
+    let data = await api("me");
+    if (state.guestClaimedToken !== state.token) {
+      try {
+        const claim = await api("claim-guest-links", { guestSessionId: guestSessionId() });
+        state.guestClaimedToken = state.token;
+        storage.setItem("urtador-guest-session", crypto.randomUUID());
+        if (claim.claimedCount > 0) data = await api("me");
+      } catch {
+        // O painel continua acessível; uma próxima atualização tentará anexar os links novamente.
+      }
+    }
     state.data = data;
     state.user = data.user;
     setLoggedIn(true);
@@ -334,6 +355,28 @@
     el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: Fabio ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
     say(el("ad-config-message"), savedSlots.length ? "" : "O banner Adsterra Beta do Fabio está preenchido como rascunho. Clique em Salvar anúncios para ativá-lo.");
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
+  }
+
+  function renderAdminReport(report) {
+    const totals = report.totals || {};
+    el("admin-report-totals").hidden = false;
+    el("report-visits").textContent = Number(totals.qualifiedVisits || 0).toLocaleString("pt-BR");
+    el("report-estimated").textContent = money(totals.estimatedAccrualCents);
+    el("report-paid").textContent = money(totals.paidPixCents);
+    el("report-open").textContent = money(totals.openPixCents);
+    const body = el("admin-report-body"); body.replaceChildren();
+    state.adminReportRows = report.rows || [];
+    for (const item of state.adminReportRows) {
+      const row = document.createElement("tr");
+      cell(row, item.period);
+      cell(row, item.phone);
+      cell(row, Number(item.qualifiedVisits || 0).toLocaleString("pt-BR"));
+      cell(row, money(item.estimatedAccrualCents));
+      cell(row, money(item.paidPixCents));
+      cell(row, money(item.openPixCents));
+      body.append(row);
+    }
+    el("export-admin-report").disabled = state.adminReportRows.length === 0;
   }
 
   el("password-login-form")?.addEventListener("submit", async (event) => {
@@ -562,16 +605,55 @@
 
   el("prelogin-link-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
-    const url = el("pending-url").value.trim();
-    storage.setItem("urtador-pending-link", JSON.stringify({url, savedAt: Date.now()}));
-    say(el("draft-message"), "Endereço guardado. Entre com sua senha ou escolha receber o código; depois do acesso, vamos retomar este link.");
-    el("login-phone").focus();
+    const form = event.currentTarget;
+    const button = form.querySelector("button[type='submit']");
+    const output = el("guest-link-output");
+    button.disabled = true;
+    output.hidden = true;
+    say(el("draft-message"), "Criando seu link…");
+    api("create", { url: el("pending-url").value, guestSessionId: guestSessionId() }).then((result) => {
+      const anchor = el("guest-link-result");
+      anchor.href = result.shortUrl;
+      anchor.textContent = result.shortUrl;
+      output.hidden = false;
+      say(el("draft-message"), "Link pronto. Ele será vinculado à sua conta se você entrar neste mesmo navegador.");
+      if (typeof window.gtag === "function") window.gtag("event", "urtador_link_created", { event_category: "engagement", event_label: "guest_short_link" });
+    }).catch((error) => say(el("draft-message"), error.message, true)).finally(() => { button.disabled = false; });
   });
 
-  const pendingDraft = storage.getItem("urtador-pending-link");
-  if (pendingDraft) {
-    try { el("pending-url").value = JSON.parse(pendingDraft).url || ""; } catch { storage.removeItem("urtador-pending-link"); }
-  }
+  el("copy-guest-link")?.addEventListener("click", async () => {
+    const url = el("guest-link-result").href;
+    try { await navigator.clipboard.writeText(url); say(el("draft-message"), "Link copiado."); }
+    catch { say(el("draft-message"), url); }
+  });
+
+  el("admin-report-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    button.disabled = true;
+    say(el("admin-report-message"), "Consultando os repasses registrados…");
+    try {
+      const report = await api("admin-report", { reportStart: el("report-start").value, reportEnd: el("report-end").value, reportGroup: el("report-group").value });
+      renderAdminReport(report);
+      say(el("admin-report-message"), `Relatório de ${dateOnly(report.start)} a ${dateOnly(report.end)} carregado.`);
+    } catch (error) { say(el("admin-report-message"), error.message, true); }
+    finally { button.disabled = false; }
+  });
+
+  el("export-admin-report")?.addEventListener("click", () => {
+    const columns = ["periodo", "telefone_gerador", "visitas_qualificadas", "repasse_estimado_centavos", "pix_pagos_centavos", "pix_em_aberto_centavos"];
+    const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const lines = [columns, ...state.adminReportRows.map((row) => [row.period, row.phone, row.qualifiedVisits, row.estimatedAccrualCents, row.paidPixCents, row.openPixCents])];
+    const blob = new Blob([`\uFEFF${lines.map((line) => line.map(quote).join(",")).join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a"); anchor.href = href; anchor.download = "urtador-relatorio-repasses.csv"; anchor.click();
+    URL.revokeObjectURL(href);
+  });
+
+  const reportToday = new Date();
+  const reportDate = new Date(reportToday.getTime() - reportToday.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  if (el("report-start")) el("report-start").value = `${reportDate.slice(0, 8)}01`;
+  if (el("report-end")) el("report-end").value = reportDate;
   if (state.phone) el("login-phone").value = state.phone;
   if (state.token && state.passwordRecovery) {
     showAuth("set-password");

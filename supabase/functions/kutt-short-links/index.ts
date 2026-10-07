@@ -9,6 +9,10 @@ type Payload = {
   url?: string;
   slug?: string;
   title?: string;
+  guestSessionId?: string;
+  reportStart?: string;
+  reportEnd?: string;
+  reportGroup?: "day" | "week" | "month";
   pixKey?: string;
   withdrawalId?: string;
   userId?: string;
@@ -359,17 +363,48 @@ async function currentRewardBaseCents() {
 }
 
 async function createLink(request: Request, payload: Payload) {
-  const { user } = await requireUser(request, payload);
-  const ipHash = await rateLimit(request, `create:${user.id}`, 30, 60);
+  const token = String(payload.token || bearer(request));
+  const guestSessionId = String(payload.guestSessionId ?? "");
+  let ownerUserId: string | null = null;
+  let guestSessionHash: string | null = null;
+  let ipHash: string;
+  if (token) {
+    const { user } = await requireUser(request, payload);
+    ownerUserId = user.id;
+    ipHash = await rateLimit(request, `create:${user.id}`, 30, 60);
+  } else {
+    if (!/^(?:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-9a-f]{64})$/i.test(guestSessionId)) {
+      throw new Error("Não foi possível validar esta sessão do navegador. Atualize a página e tente de novo.");
+    }
+    if (clientIp(request) === "unknown") throw new Error("Não foi possível validar sua conexão. Tente novamente.");
+    ipHash = await rateLimit(request, "guest-create-ip", 10, 60);
+    await rateLimitIdentity("guest-create-session", guestSessionId, 10, 60);
+    guestSessionHash = await hash(`urtador:guest:${guestSessionId}:${serviceRoleKey}`);
+  }
   const targetUrl = normalizeUrl(payload.url);
   const slug = normalizeSlug(payload.slug);
   const title = String(payload.title ?? "").trim().slice(0, 120) || null;
   const { data, error } = await supabase.from("kutt_short_links")
-    .insert({ slug, target_url: targetUrl, title, owner_user_id: user.id, creator_ip_hash: ipHash })
+    .insert({ slug, target_url: targetUrl, title, owner_user_id: ownerUserId, guest_session_hash: guestSessionHash, creator_ip_hash: ipHash })
     .select("slug, target_url").single();
   if (error?.code === "23505") throw new Error("Esse final já está em uso. Escolha outro.");
   if (error) throw error;
   return { slug: data.slug, url: data.target_url, shortUrl: `${publicBaseUrl}/${data.slug}` };
+}
+
+async function claimGuestLinks(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload);
+  const guestSessionId = String(payload.guestSessionId ?? "");
+  if (!/^(?:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}|[0-9a-f]{64})$/i.test(guestSessionId)) {
+    throw new Error("Sessão temporária inválida.");
+  }
+  const guestSessionHash = await hash(`urtador:guest:${guestSessionId}:${serviceRoleKey}`);
+  const { data, error } = await supabase.from("kutt_short_links")
+    .update({ owner_user_id: user.id, guest_session_hash: null })
+    .is("owner_user_id", null).eq("guest_session_hash", guestSessionHash)
+    .select("slug");
+  if (error) throw error;
+  return { ok: true, claimedCount: data?.length ?? 0 };
 }
 
 function looksAutomated(userAgent: string) {
@@ -445,6 +480,90 @@ async function readAllRows(table: string, columns: string, orderBy: string) {
     rows.push(...(data ?? []));
     if ((data ?? []).length < pageSize) return rows;
   }
+}
+
+function validReportDay(value: unknown) {
+  const day = String(value ?? "");
+  const parsed = /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00Z`) : new Date(Number.NaN);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== day) {
+    throw new Error("Escolha um período válido para o relatório.");
+  }
+  return day;
+}
+
+function reportBucket(day: string, group: "day" | "week" | "month") {
+  if (group === "day") return day;
+  if (group === "month") return day.slice(0, 7);
+  const date = new Date(`${day}T00:00:00Z`);
+  const mondayOffset = (date.getUTCDay() + 6) % 7;
+  date.setUTCDate(date.getUTCDate() - mondayOffset);
+  return date.toISOString().slice(0, 10);
+}
+
+async function readRowsBetween(table: string, columns: string, orderBy: string, start: string, end: string) {
+  const pageSize = 1000;
+  const rows: Record<string, any>[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from(table).select(columns).gte(orderBy, start).lte(orderBy, end)
+      .order(orderBy, { ascending: true }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(...(data ?? []));
+    if ((data ?? []).length < pageSize) return rows;
+  }
+}
+
+async function adminReport(payload: Payload) {
+  const start = validReportDay(payload.reportStart);
+  const end = validReportDay(payload.reportEnd);
+  const group = payload.reportGroup ?? "day";
+  if (start > end || (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) > 366 * 86400000) {
+    throw new Error("O período precisa estar em ordem e ter no máximo 367 dias.");
+  }
+  if (!["day", "week", "month"].includes(group)) throw new Error("Escolha o agrupamento diário, semanal ou mensal.");
+  const endExclusive = new Date(`${end}T00:00:00Z`);
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
+  const endTimestamp = endExclusive.toISOString();
+  const [visits, paidWithdrawals, openWithdrawals] = await Promise.all([
+    readRowsBetween("kutt_reward_visits", "owner_user_id, visit_day, payout_percent, reward_base_cents, user:kutt_users!kutt_reward_visits_owner_user_id_fkey(phone)", "visit_day", start, end),
+    readRowsBetween("kutt_withdrawals", "user_id, amount_cents, status, processed_at, requested_at, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "processed_at", `${start}T00:00:00.000Z`, endTimestamp),
+    readRowsBetween("kutt_withdrawals", "user_id, amount_cents, status, processed_at, requested_at, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)", "requested_at", `${start}T00:00:00.000Z`, endTimestamp)
+  ]);
+  const grouped = new Map<string, { period: string; userId: string; phone: string; qualifiedVisits: number; estimatedAccrualCents: number; paidPixCents: number; openPixCents: number }>();
+  const ensure = (period: string, userId: string, phone: string) => {
+    const key = `${period}:${userId}`;
+    if (!grouped.has(key)) grouped.set(key, { period, userId, phone, qualifiedVisits: 0, estimatedAccrualCents: 0, paidPixCents: 0, openPixCents: 0 });
+    return grouped.get(key)!;
+  };
+  for (const visit of visits) {
+    const user = Array.isArray(visit.user) ? visit.user[0] : visit.user;
+    const row = ensure(reportBucket(String(visit.visit_day).slice(0, 10), group), visit.owner_user_id, String(user?.phone ?? "Conta"));
+    row.qualifiedVisits++;
+    row.estimatedAccrualCents += Math.round(Number(visit.payout_percent ?? 100) * 100) * Number(visit.reward_base_cents ?? 7000);
+  }
+  for (const withdrawal of paidWithdrawals) {
+    if (withdrawal.status !== "paid" || !withdrawal.processed_at) continue;
+    const day = new Date(withdrawal.processed_at).toISOString().slice(0, 10);
+    if (day < start || day > end) continue;
+    const user = Array.isArray(withdrawal.user) ? withdrawal.user[0] : withdrawal.user;
+    ensure(reportBucket(day, group), withdrawal.user_id, String(user?.phone ?? "Conta")).paidPixCents += Number(withdrawal.amount_cents ?? 0);
+  }
+  for (const withdrawal of openWithdrawals) {
+    if (withdrawal.status !== "pending" && withdrawal.status !== "approved") continue;
+    const day = new Date(withdrawal.requested_at).toISOString().slice(0, 10);
+    if (day < start || day > end) continue;
+    const user = Array.isArray(withdrawal.user) ? withdrawal.user[0] : withdrawal.user;
+    ensure(reportBucket(day, group), withdrawal.user_id, String(user?.phone ?? "Conta")).openPixCents += Number(withdrawal.amount_cents ?? 0);
+  }
+  const rows = [...grouped.values()].map((row) => ({ ...row, estimatedAccrualCents: Math.floor(row.estimatedAccrualCents / 10_000_000) }))
+    .sort((a, b) => a.period.localeCompare(b.period) || a.phone.localeCompare(b.phone));
+  return {
+    start, end, group,
+    totals: rows.reduce((total, row) => ({ qualifiedVisits: total.qualifiedVisits + row.qualifiedVisits,
+      estimatedAccrualCents: total.estimatedAccrualCents + row.estimatedAccrualCents,
+      paidPixCents: total.paidPixCents + row.paidPixCents, openPixCents: total.openPixCents + row.openPixCents }),
+    { qualifiedVisits: 0, estimatedAccrualCents: 0, paidPixCents: 0, openPixCents: 0 }),
+    rows
+  };
 }
 
 function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<string, any>[], links: Record<string, any>[], visits: Record<string, any>[]) {
@@ -538,6 +657,7 @@ async function adminAction(request: Request, payload: Payload) {
     ]);
     return { users, withdrawals, links, adConfiguration, summary: makeAdminSummary(users, withdrawals, links, visits) };
   }
+  if (payload.action === "admin-report") return await adminReport(payload);
   if (payload.action === "admin-set-user-payout") {
     const userId = String(payload.userId ?? "");
     const payoutPercent = Number(payload.payoutPercent);
@@ -589,8 +709,8 @@ async function adminAction(request: Request, payload: Payload) {
       updated_by: user.id
     }, { onConflict: "id" });
     if (error) throw error;
-    const fabioBanners = slots.filter((slot) => slot.owner === "owner").length;
-    const mateusBanners = slots.filter((slot) => slot.owner === "mateus").length;
+    const fabioBanners = slots.filter((slot) => slot?.owner === "owner").length;
+    const mateusBanners = slots.filter((slot) => slot?.owner === "mateus").length;
     const bannerLabel = (count: number) => `${count} ${count === 1 ? "banner" : "banners"}`;
     const notified = slots.length || payload.adsenseEnabled
       ? await notifyCollaboratorGroup(`✅ Anúncios atualizados\nFabio: ${bannerLabel(fabioBanners)}\nMatheus: ${bannerLabel(mateusBanners)}\nPágina: Guia`)
@@ -627,12 +747,14 @@ Deno.serve(async (request) => {
       case "set-password": return json(request, 200, await setPassword(request, payload));
       case "me": return json(request, 200, await profile(request, payload));
       case "create": return json(request, 200, await createLink(request, payload));
+      case "claim-guest-links": return json(request, 200, await claimGuestLinks(request, payload));
       case "resolve": return json(request, 200, await resolveLink(request, payload));
       case "save-pix": return json(request, 200, await setPix(request, payload));
       case "withdraw": return json(request, 200, await requestWithdrawal(request, payload));
       case "logout": return json(request, 200, await logout(request, payload));
       case "public-ad-configuration": return json(request, 200, await publicAdConfiguration());
       case "admin-list":
+      case "admin-report":
       case "admin-withdrawal":
       case "admin-set-user-payout":
       case "admin-set-reward-base":
