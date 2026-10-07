@@ -14,20 +14,24 @@
     document.head.appendChild(script);
   }
 
-  function renderBanner(slot, index) {
-    if (!/^[a-f0-9]{32}$/i.test(String(slot.key || ""))) return;
-    if (!new Set(["www.highperformanceformat.com", "highperformanceformat.com"]).has(String(slot.host || "").toLowerCase())) return;
+  function isValidBanner(slot) {
+    if (!/^[a-f0-9]{32}$/i.test(String(slot.key || ""))) return false;
+    if (!new Set(["www.highperformanceformat.com", "highperformanceformat.com"]).has(String(slot.host || "").toLowerCase())) return false;
     const width = Number(slot.width);
     const height = Number(slot.height);
-    if (!Number.isInteger(width) || !Number.isInteger(height) || width < 120 || width > 728 || height < 50 || height > 600) return;
+    return Number.isInteger(width) && Number.isInteger(height) && width >= 120 && width <= 728 && height >= 50 && height <= 600;
+  }
 
-    const container = document.querySelector(`[data-content-ad="${index + 1}"]`);
+  function renderBanner(slot, placement) {
+    const container = document.querySelector(`[data-content-ad="${placement}"]`);
     if (!container) return;
+    const width = Number(slot.width);
+    const height = Number(slot.height);
     const heading = document.createElement("p");
     heading.className = "content-ad-label";
     heading.textContent = "Publicidade";
     const frame = document.createElement("iframe");
-    frame.title = `Publicidade — banner ${index + 1}`;
+    frame.title = `Publicidade — banner ${placement}`;
     frame.width = String(width);
     frame.height = String(height);
     frame.loading = "lazy";
@@ -45,7 +49,15 @@
     if (!response.ok) return;
     const data = await response.json();
     if (data.adsenseEnabled) addAdsenseLoader();
-    (Array.isArray(data.slots) ? data.slots.slice(0, 6) : []).forEach(renderBanner);
+    const banners = (Array.isArray(data.slots) ? data.slots : []).filter(isValidBanner);
+    if (banners.length) {
+      // Rotate through the saved units by UTC day; show at most three well-spaced banners per guide visit.
+      const first = Math.floor(Date.now() / 86400000) % banners.length;
+      const placements = [2, 4, 6];
+      placements.slice(0, Math.min(3, banners.length)).forEach((placement, index) => {
+        renderBanner(banners[(first + index) % banners.length], placement);
+      });
+    }
   } catch {
     // Content and link creation remain available when ad settings cannot be loaded.
   }
