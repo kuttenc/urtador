@@ -4,16 +4,6 @@
   const headers = { "Content-Type": "application/json" };
   if (config.publishableKey) headers.apikey = config.publishableKey;
 
-  function addAdsenseLoader() {
-    if (document.querySelector('script[data-adsense-loader="urtador"]')) return;
-    const script = document.createElement("script");
-    script.async = true;
-    script.crossOrigin = "anonymous";
-    script.dataset.adsenseLoader = "urtador";
-    script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6464589391694014";
-    document.head.appendChild(script);
-  }
-
   function isValidBanner(slot) {
     if (!/^[a-f0-9]{32}$/i.test(String(slot.key || ""))) return false;
     const host = String(slot.host || "").toLowerCase();
@@ -55,7 +45,6 @@
     if (!response.ok) return;
     const data = await response.json();
     const banners = (Array.isArray(data.slots) ? data.slots : []).filter(isValidBanner);
-    if (data.adsenseEnabled && !banners.length) addAdsenseLoader();
     if (banners.length) {
       // Rotate through the saved units by UTC day; show at most three well-spaced banners per guide visit.
       const first = Math.floor(Date.now() / 86400000) % banners.length;

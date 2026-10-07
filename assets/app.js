@@ -551,7 +551,7 @@
         adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value, owner: el(`banner-owner-${index + 1}`).value }))
       });
       const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " Não foi possível enviar o aviso ao grupo; confira a conexão do WhatsApp.";
-      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) na página Guia. O redirecionamento permanece sem anúncios e sem espera.${groupNotice}`);
+      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) Adsterra na página Guia. O AdSense só carrega depois da aprovação; as etapas do redirecionamento ficam sem anúncios e duram 20 segundos cada.${groupNotice}`);
       await refreshAdmin();
     } catch (error) {
       say(el("ad-config-message"), error.message, true);
