@@ -34,7 +34,7 @@ Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto 
 npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
-As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001`–`202610070003` adicionam configuração de anúncios, títulos obrigatórios e taxas individuais de repasse; aplique-as antes de publicar a Edge Function atualizada.
+As migrações SQL criam as tabelas e políticas necessárias. As migrações `202610070001`–`202610070004` adicionam configuração de anúncios, taxas individuais de repasse e recuperação segura de senha; aplique-as antes de publicar a Edge Function atualizada.
 
 ## Acesso e pagamentos
 
@@ -50,4 +50,6 @@ O administrador configura Auto ads do AdSense e até seis banners Adsterra no pa
 
 Abra `index.html` diretamente no navegador ou sirva a pasta com qualquer servidor estatico.
 
-A migração `202610070002` adiciona títulos obrigatórios para fornecedores/anúncios ativos; AdSense também exige título quando habilitado. A migração `202610070003` adiciona taxas de repasse por usuário e preserva a taxa usada por visita.
+A migração `202610070002` adiciona títulos obrigatórios para fornecedores/anúncios ativos; AdSense também exige título quando habilitado. A migração `202610070003` adiciona taxas de repasse por usuário e preserva a taxa usada por visita. A migração `202610070004` adiciona campos de controle para recuperação de senha.
+
+Recuperação: pessoas com conta e senha podem solicitar um código WhatsApp de seis dígitos. O código expira em 10 minutos, limita tentativas e libera apenas uma sessão restrita para definir a nova senha; outras sessões são encerradas ao concluir.

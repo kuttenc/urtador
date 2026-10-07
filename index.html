@@ -12,7 +12,7 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20261007-rates">
+    <link rel="stylesheet" href="assets/styles.css?v=20261007-recovery">
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -43,13 +43,20 @@
                 <button class="button" type="submit">Entrar</button>
               </form>
               <button class="button secondary" type="button" id="first-access-button">Primeiro acesso: receber código</button>
+              <button class="button secondary" type="button" id="forgot-password-button">Esqueci minha senha</button>
+              <form id="password-recovery-form" hidden>
+                <p class="field-help">Informe o telefone cadastrado. Enviaremos um código de 6 dígitos para redefinir a senha.</p>
+                <div class="field"><label for="recovery-phone">Seu celular com DDD</label><input id="recovery-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
+                <button class="button" type="submit">Enviar código de recuperação</button>
+                <button class="button secondary" type="button" id="recovery-back">Voltar ao login</button>
+              </form>
               <form id="otp-form" hidden>
                 <div class="field"><label for="otp">Código de 6 dígitos</label><input id="otp" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></div>
                 <button class="button" type="submit">Confirmar código</button>
                 <button class="button secondary" type="button" id="change-phone">Voltar</button>
               </form>
               <form id="set-password-form" hidden>
-                <p class="field-help">WhatsApp confirmado. Crie sua senha para concluir o primeiro acesso.</p>
+                <p class="field-help" id="password-form-help">WhatsApp confirmado. Crie sua senha para concluir o primeiro acesso.</p>
                 <div class="field"><label for="new-password">Crie uma senha</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" aria-describedby="password-help" required><small id="password-help" class="field-help">Use pelo menos 10 caracteres. Você usará essa senha nos próximos acessos.</small></div>
                 <div class="field"><label for="confirm-password">Confirme a senha</label><input id="confirm-password" name="password-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
                 <button class="button" type="submit">Salvar senha</button>
@@ -199,6 +206,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261007-rates"></script>
+    <script src="assets/app.js?v=20261007-recovery"></script>
   </body>
 </html>
