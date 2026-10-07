@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Conferir destino - Urtador</title>
-    <link rel="stylesheet" href="/urtador/assets/styles.css?v=20261007-redirect-steps">
+    <link rel="stylesheet" href="/urtador/assets/styles.css?v=20261007-redirect-preview">
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -29,7 +29,8 @@
           <h1>Confira o destino</h1>
           <p class="message" data-redirect-status>Carregando o endereço informado por quem criou este link...</p>
           <p class="redirect-destination" data-redirect-destination hidden></p>
-          <p class="redirect-note" data-redirect-note hidden>Confira o domínio e só continue se reconhecer o endereço.</p>
+          <details class="redirect-full-link" data-redirect-full-link hidden><summary>Ver endereço completo</summary><code data-redirect-full-url></code></details>
+          <p class="redirect-note" data-redirect-note hidden>O domínio aparece completo e o caminho está abreviado. Confira o endereço inteiro antes de continuar.</p>
           <button class="redirect-continue" data-redirect-review type="button" hidden>Endereço conferido · Próxima etapa</button>
         </div>
         <div class="redirect-step" data-redirect-step="2" hidden>
@@ -37,6 +38,7 @@
           <h1>Você está saindo do Urtador</h1>
           <p class="message">Este é o endereço que será aberto:</p>
           <p class="redirect-destination" data-redirect-destination-final></p>
+          <details class="redirect-full-link" data-redirect-full-link hidden><summary>Ver endereço completo</summary><code data-redirect-full-url></code></details>
           <p class="redirect-note">Ao tocar em “Abrir destino”, você continuará para este site externo.</p>
           <button class="redirect-continue" data-redirect-open type="button">Abrir destino</button>
           <button class="redirect-back" data-redirect-back type="button">Voltar e conferir</button>
@@ -44,6 +46,6 @@
       </section>
     </main>
     <script src="/urtador/assets/config.js"></script>
-    <script src="/urtador/assets/redirect.js?v=20261007-redirect-steps"></script>
+    <script src="/urtador/assets/redirect.js?v=20261007-redirect-preview"></script>
   </body>
 </html>

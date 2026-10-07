@@ -46,6 +46,8 @@ O valor-base é R$ 70 por mil visitas qualificadas e únicas por usuário, dedup
 
 O administrador configura Auto ads do AdSense e até seis banners Adsterra no painel. Na `guia.html`, no máximo três banners claramente identificados como publicidade aparecem em posições espaçadas; as unidades configuradas alternam diariamente. Anúncios não são obrigatórios nem condicionam o acesso aos links. As etapas de redirecionamento não têm anúncios, temporizadores ou bloqueios. Banners Adsterra são aceitos apenas como configuração validada de chave, tamanho e host permitido; scripts arbitrários não são executados.
 
+Cada banner pode ser identificado como pertencente ao administrador ou ao Matheus para organizar a divisão entre sócios. Essa marcação não representa receita apurada pelo fornecedor. A prévia administrativa mostra o espaço e o tamanho do banner sem executar o script. O valor-base interno de repasse por mil visitas qualificadas pode ser ajustado; cada visita mantém o valor e o percentual vigentes quando foi registrada. Essa regra não é o CPM real do provedor de anúncios.
+
 ## Teste local
 
 Abra `index.html` diretamente no navegador ou sirva a pasta com qualquer servidor estatico.

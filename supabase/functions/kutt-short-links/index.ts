@@ -13,6 +13,7 @@ type Payload = {
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
+  rewardBaseCents?: number;
   adsenseEnabled?: boolean;
   adsenseTitle?: string;
   adScripts?: unknown[];
@@ -24,7 +25,7 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
 const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const publicBaseUrl = (Deno.env.get("PUBLIC_BASE_URL") ?? "https://kuttenc.github.io/urtador").replace(/\/$/, "");
 const ownerPhone = normalizePhone(Deno.env.get("OWNER_PHONE") ?? "11989346164");
-const adminPhones = new Set([ownerPhone, ...(Deno.env.get("ADMIN_PHONES") ?? "").split(",").map((phone) => phone.trim()).filter(Boolean).map(normalizePhone)]);
+const adminPhones = new Set([ownerPhone, "12996629929", ...(Deno.env.get("ADMIN_PHONES") ?? "").split(",").map((phone) => phone.trim()).filter(Boolean).map(normalizePhone)]);
 const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
 const greenApiUrl = (Deno.env.get("GREEN_API_URL") ?? "").replace(/\/$/, "");
 const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID") ?? "";
@@ -111,7 +112,9 @@ function parseAdsterraBanner(input: unknown, index: number) {
   const source = String(entry.code ?? input ?? "").trim();
   if (!source) return null;
   const title = String(entry.title ?? "").trim();
+  const owner = String(entry.owner ?? "").trim();
   if (!title || title.length > 80) throw new Error(`Informe um título de até 80 caracteres para o anúncio ${index}.`);
+  if (!new Set(["owner", "mateus"]).has(owner)) throw new Error(`Selecione se o anúncio ${index} pertence a você ou ao Matheus.`);
   if (source.length > 12000) throw new Error(`O código do anúncio ${index} excede o limite de 12 mil caracteres.`);
   const keyMatch = source.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{32})['"]/i);
   const widthMatch = source.match(/['"]width['"]\s*:\s*(\d{2,4})/i);
@@ -131,7 +134,7 @@ function parseAdsterraBanner(input: unknown, index: number) {
     throw new Error(`O anúncio ${index} usa uma origem não reconhecida. Use o código gerado para seu site no painel oficial Adsterra.`);
   }
   if (width < 120 || width > 728 || height < 50 || height > 600) throw new Error(`As dimensões do anúncio ${index} estão fora do limite permitido.`);
-  return { title, key, width, height, host: scriptUrl.hostname.toLowerCase() };
+  return { title, owner, key, width, height, host: scriptUrl.hostname.toLowerCase() };
 }
 
 function formatAdsterraBanner(slot: Record<string, unknown>) {
@@ -319,24 +322,31 @@ async function profile(request: Request, payload: Payload) {
     .select("id, amount_cents, pix_key, status, requested_at, processed_at, admin_note").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(20);
   if (withdrawalError) throw withdrawalError;
   const rewards = await readRewardBalance(user.id);
+  const rewardBaseCents = await currentRewardBaseCents();
   const reservedCents = (withdrawals ?? []).filter((w) => w.status !== "rejected").reduce((sum, w) => sum + Number(w.amount_cents), 0);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
 async function readRewardBalance(userId: string) {
   const pageSize = 1000;
   let visitCount = 0;
-  let totalRateBasisPoints = 0;
+  let rewardNumerator = 0;
   for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase.from("kutt_reward_visits").select("payout_percent")
+    const { data, error } = await supabase.from("kutt_reward_visits").select("payout_percent, reward_base_cents")
       .eq("owner_user_id", userId).order("id", { ascending: true }).range(offset, offset + pageSize - 1);
     if (error) throw error;
     const rows = data ?? [];
     visitCount += rows.length;
-    for (const row of rows) totalRateBasisPoints += Math.round(Number(row.payout_percent ?? 100) * 100);
+    for (const row of rows) rewardNumerator += Math.round(Number(row.payout_percent ?? 100) * 100) * Number(row.reward_base_cents ?? 7000);
     if (rows.length < pageSize) break;
   }
-  return { visitCount, earnedCents: Math.floor(totalRateBasisPoints / 10_000_000) * 7000 };
+  return { visitCount, earnedCents: Math.floor(rewardNumerator / 10_000_000) };
+}
+
+async function currentRewardBaseCents() {
+  const { data, error } = await supabase.from("kutt_ad_configuration").select("reward_base_cents").eq("id", true).maybeSingle();
+  if (error) throw error;
+  return Number(data?.reward_base_cents ?? 7000);
 }
 
 async function createLink(request: Request, payload: Payload) {
@@ -378,7 +388,8 @@ async function resolveLink(request: Request, payload: Payload) {
     if (eligible) {
       const { data: owner, error: ownerError } = await supabase.from("kutt_users").select("payout_percent").eq("id", data.owner_user_id).maybeSingle();
       if (ownerError) throw ownerError;
-      const { error: rewardError } = await supabase.from("kutt_reward_visits").insert({ owner_user_id: data.owner_user_id, visitor_ip_hash: visitorHash, first_link_id: data.id, payout_percent: Number(owner?.payout_percent ?? 100) });
+      const rewardBaseCents = await currentRewardBaseCents();
+      const { error: rewardError } = await supabase.from("kutt_reward_visits").insert({ owner_user_id: data.owner_user_id, visitor_ip_hash: visitorHash, first_link_id: data.id, payout_percent: Number(owner?.payout_percent ?? 100), reward_base_cents: rewardBaseCents });
       if (rewardError && rewardError.code !== "23505") throw rewardError;
     }
   }
@@ -489,12 +500,13 @@ async function notifyCollaboratorGroup(message: string) {
 
 async function readAdConfiguration() {
   const { data, error } = await supabase.from("kutt_ad_configuration")
-    .select("adsense_enabled, adsterra_slots").eq("id", true).maybeSingle();
+    .select("adsense_enabled, adsense_title, adsterra_slots, reward_base_cents").eq("id", true).maybeSingle();
   if (error) throw error;
   const slots = Array.isArray(data?.adsterra_slots) ? data.adsterra_slots : [];
   return {
     adsenseEnabled: Boolean(data?.adsense_enabled),
     adsenseTitle: String(data?.adsense_title ?? ""),
+    rewardBaseCents: Number(data?.reward_base_cents ?? 7000),
     slots: slots.map((slot: Record<string, unknown>) => ({ ...slot, script: formatAdsterraBanner(slot) }))
   };
 }
@@ -529,13 +541,29 @@ async function adminAction(request: Request, payload: Payload) {
     if (Number(target.payout_percent ?? 100) === nextPercent) return { ok: true, notificationSent: false, unchanged: true };
     const { error } = await supabase.from("kutt_users").update({ payout_percent: nextPercent, updated_at: new Date().toISOString() }).eq("id", userId);
     if (error) throw error;
-    const ratePerThousandCents = Math.round(7000 * nextPercent / 100);
+    const rewardBaseCents = await currentRewardBaseCents();
+    const ratePerThousandCents = Math.round(rewardBaseCents * nextPercent / 100);
     const maskedPhone = `final ${String(target.phone).slice(-4)}`;
     const formattedPercent = nextPercent.toLocaleString("pt-BR", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
     const formattedRate = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(ratePerThousandCents / 100);
-    const message = `📊 Taxa de ganhos atualizada no Urtador\nColaborador: ${maskedPhone}\nPercentual: ${formattedPercent}% do valor-base.\nReferência: ${formattedRate} por 1.000 visitas qualificadas e únicas.\nA nova taxa vale para visitas futuras; registros anteriores mantêm a taxa que tinham. Esse valor é uma regra interna do Urtador, não o CPM nem a receita real do Google AdSense.`;
+    const message = `📊 Taxa de ganhos atualizada no Urtador\nColaborador: ${maskedPhone}\nPercentual: ${formattedPercent}% do valor-base.\nReferência: ${formattedRate} por 1.000 visitas qualificadas e únicas.\nA nova taxa vale para visitas futuras; registros anteriores mantêm a taxa que tinham. Esse valor é uma regra interna do Urtador, não CPM nem receita de anúncios.`;
     const notificationSent = await notifyCollaboratorGroup(message);
-    return { ok: true, notificationSent, payoutPercent: nextPercent, ratePerThousandCents };
+    return { ok: true, notificationSent, payoutPercent: nextPercent, ratePerThousandCents, rewardBaseCents };
+  }
+  if (payload.action === "admin-set-reward-base") {
+    const rewardBaseCents = Number(payload.rewardBaseCents);
+    if (!Number.isInteger(rewardBaseCents) || rewardBaseCents < 0 || rewardBaseCents > 50000) throw new Error("O valor-base deve ficar entre R$ 0,00 e R$ 500,00 por mil visitas qualificadas.");
+    const previousRewardBaseCents = await currentRewardBaseCents();
+    const { error } = await supabase.from("kutt_ad_configuration").upsert({
+      id: true,
+      reward_base_cents: rewardBaseCents,
+      updated_at: new Date().toISOString(),
+      updated_by: user.id
+    }, { onConflict: "id" });
+    if (error) throw error;
+    const formatMoney = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+    const notificationSent = await notifyCollaboratorGroup(`📊 Valor-base interno de ganhos atualizado no Urtador\nAntes: ${formatMoney(previousRewardBaseCents)} por mil visitas qualificadas.\nAgora: ${formatMoney(rewardBaseCents)} por mil visitas qualificadas.\nA nova regra vale para visitas futuras; visitas registradas mantêm o valor anterior. Isso não representa CPM nem receita de anúncios.`);
+    return { ok: true, rewardBaseCents, notificationSent };
   }
   if (payload.action === "admin-save-ad-configuration") {
     if (typeof payload.adsenseEnabled !== "boolean") throw new Error("Informe se o AdSense está habilitado.");
@@ -556,10 +584,11 @@ async function adminAction(request: Request, payload: Payload) {
       ...(slots.length ? [`Adsterra (${slots.map((slot) => slot.title).join(", ")})`] : []),
       ...(payload.adsenseEnabled ? [`Google AdSense (${adsenseTitle}; aguardando aprovação antes de ativar na página)`] : [])
     ];
+    const ownerSummary = slots.length ? `Titularidade configurada: você ${slots.filter((slot) => slot.owner === "owner").length}, Matheus ${slots.filter((slot) => slot.owner === "mateus").length}.` : "Nenhum banner Adsterra ativo.";
     const notified = activeProviders.length
-      ? await notifyCollaboratorGroup(`✅ Atualização de anúncios salva no Urtador. Fornecedor(es) configurado(s): ${activeProviders.join("; ")}. Os anúncios são exibidos somente na página Guia. Google AdSense: ${payload.adsenseEnabled ? "marcado como habilitado" : "desligado"}; a veiculação depende da aprovação do site.`)
+      ? await notifyCollaboratorGroup(`✅ Atualização de anúncios salva no Urtador. Fornecedor(es) configurado(s): ${activeProviders.join("; ")}. ${ownerSummary} Os anúncios são exibidos somente na página Guia. Google AdSense: ${payload.adsenseEnabled ? "marcado como habilitado" : "desligado"}; a veiculação depende da aprovação do site.`)
       : false;
-    return { ok: true, notificationSent: notified, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, adsenseTitle, slots } };
+    return { ok: true, notificationSent: notified, adConfiguration: { adsenseEnabled: payload.adsenseEnabled, adsenseTitle, rewardBaseCents: await currentRewardBaseCents(), slots } };
   }
   if (payload.action === "admin-withdrawal") {
     const status = payload.status;
@@ -599,6 +628,7 @@ Deno.serve(async (request) => {
       case "admin-list":
       case "admin-withdrawal":
       case "admin-set-user-payout":
+      case "admin-set-reward-base":
       case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));
       default: return json(request, 400, { error: "Ação inválida." });
     }

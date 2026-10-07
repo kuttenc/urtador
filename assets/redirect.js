@@ -9,6 +9,8 @@
   const destinationText = document.querySelector("[data-redirect-destination]");
   const destinationNote = document.querySelector("[data-redirect-note]");
   const finalDestinationText = document.querySelector("[data-redirect-destination-final]");
+  const fullLinkDetails = [...document.querySelectorAll("[data-redirect-full-link]")];
+  const fullLinkTexts = [...document.querySelectorAll("[data-redirect-full-url]")];
   const steps = [...document.querySelectorAll("[data-redirect-step]")];
   let destinationUrl = "";
   const path = window.location.pathname;
@@ -23,6 +25,14 @@
     steps.forEach((step) => {
       step.hidden = step.dataset.redirectStep !== String(number);
     });
+  }
+
+  function destinationPreview(parsedDestination) {
+    const path = parsedDestination.pathname.replace(/\/+$/, "");
+    const suffix = path.length > 1 ? path.slice(-2) : "";
+    const previewPath = suffix ? `/…${suffix}` : "/";
+    const hasExtra = Boolean(parsedDestination.search || parsedDestination.hash);
+    return `${parsedDestination.origin}${previewPath}${hasExtra ? " · parâmetros ocultos" : ""}`;
   }
 
   reviewButton?.addEventListener("click", () => showStep(2));
@@ -49,10 +59,12 @@
     if (!["http:", "https:"].includes(parsedDestination.protocol)) throw new Error("Este link não possui um destino web válido.");
     destinationUrl = parsedDestination.href;
     if (destinationText) {
-      destinationText.textContent = parsedDestination.href;
+      destinationText.textContent = destinationPreview(parsedDestination);
       destinationText.hidden = false;
     }
-    if (finalDestinationText) finalDestinationText.textContent = parsedDestination.href;
+    if (finalDestinationText) finalDestinationText.textContent = destinationPreview(parsedDestination);
+    fullLinkTexts.forEach((element) => { element.textContent = parsedDestination.href; });
+    fullLinkDetails.forEach((element) => { element.hidden = false; });
     if (destinationNote) destinationNote.hidden = false;
     if (reviewButton) {
       reviewButton.disabled = false;

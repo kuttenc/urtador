@@ -67,6 +67,51 @@
     return a;
   }
 
+  function parseAdPreview(source) {
+    const text = String(source || "");
+    const key = text.match(/['"]key['"]\s*:\s*['"]([a-f0-9]{32})['"]/i)?.[1]?.toLowerCase();
+    const width = Number(text.match(/['"]width['"]\s*:\s*(\d{2,4})/i)?.[1]);
+    const height = Number(text.match(/['"]height['"]\s*:\s*(\d{2,4})/i)?.[1]);
+    const sourceUrl = text.match(/<script\b[^>]*\bsrc\s*=\s*['"](https:\/\/[^'"]+)['"]/i)?.[1];
+    if (!key || !sourceUrl || !Number.isInteger(width) || !Number.isInteger(height) || width < 120 || width > 728 || height < 50 || height > 600) {
+      throw new Error("Cole o código completo do banner gerado no painel Publisher.");
+    }
+    const parsed = new URL(sourceUrl);
+    const allowedHosts = new Set(["www.highperformanceformat.com", "highperformanceformat.com"]);
+    if (parsed.protocol !== "https:" || !allowedHosts.has(parsed.hostname.toLowerCase()) || parsed.pathname.toLowerCase() !== `/${key}/invoke.js`) {
+      throw new Error("Este código usa um endereço de script não permitido. Cole o snippet oficial validado pelo painel.");
+    }
+    return { key, width, height, host: parsed.hostname.toLowerCase() };
+  }
+
+  function showAdPreview(index) {
+    const preview = document.querySelector(`[data-banner-preview-frame="${index}"]`);
+    if (!preview) return;
+    try {
+      const banner = parseAdPreview(el(`banner-code-${index}`).value);
+      const mock = document.createElement("div");
+      mock.className = "banner-preview-mock";
+      mock.setAttribute("role", "img");
+      mock.setAttribute("aria-label", `Espaço de anúncio ${banner.width} por ${banner.height} pixels`);
+      mock.style.aspectRatio = `${banner.width} / ${banner.height}`;
+      mock.style.width = `min(100%, ${Math.min(banner.width, 560)}px)`;
+      const title = document.createElement("strong");
+      title.textContent = el(`banner-title-${index}`).value.trim() || `Banner ${index}`;
+      const size = document.createElement("span");
+      size.textContent = `${banner.width} × ${banner.height} px`;
+      mock.replaceChildren(title, size);
+      const note = document.createElement("p");
+      note.className = "field-help";
+      note.textContent = "Prévia do espaço e dimensões. O script não é executado aqui, evitando gerar uma impressão de teste.";
+      preview.replaceChildren(note, mock);
+    } catch (error) {
+      const message = document.createElement("p");
+      message.className = "message error";
+      message.textContent = error.message;
+      preview.replaceChildren(message);
+    }
+  }
+
   function setLoggedIn(on) {
     el("auth-view").hidden = on;
     el("dashboard-view").hidden = !on;
@@ -123,7 +168,8 @@
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);
     const payoutPercent = Number(data.user.payoutPercent ?? 100);
-    el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(7000 * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
+    const rewardBaseCents = Number(data.rewardBaseCents ?? 7000);
+    el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(rewardBaseCents * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
     el("pix-key").value = data.user.pixKey || "";
     const linksBody = el("links-body");
     linksBody.replaceChildren();
@@ -227,7 +273,7 @@
         try {
           const result = await api("admin-set-user-payout", { userId: item.id, payoutPercent: Number(rateInput.value) });
           const percent = Number(result.payoutPercent ?? rateInput.value);
-          const perThousand = money(Number(result.ratePerThousandCents ?? Math.round(7000 * percent / 100)));
+          const perThousand = money(Number(result.ratePerThousandCents ?? Math.round(Number(result.rewardBaseCents ?? 7000) * percent / 100)));
           await refreshAdmin();
           say(el("admin-load-message"), result.unchanged
             ? `A taxa de ${item.phone} já era ${percent}%; nenhuma mudança ou mensagem enviada.`
@@ -247,13 +293,19 @@
       const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
       cell(row, Number(item.click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
     }
-    const adConfiguration = data.adConfiguration || { adsenseEnabled: false, slots: [] };
+    const adConfiguration = data.adConfiguration || { adsenseEnabled: false, rewardBaseCents: 7000, slots: [] };
+    el("reward-base-value").value = (Number(adConfiguration.rewardBaseCents ?? 7000) / 100).toFixed(2);
     el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);
     el("adsense-title").value = adConfiguration.adsenseTitle || "";
+    const ownerCounts = { owner: 0, mateus: 0, missing: 0 };
     for (let index = 0; index < 6; index++) {
       el(`banner-title-${index + 1}`).value = adConfiguration.slots?.[index]?.title || "";
       el(`banner-code-${index + 1}`).value = adConfiguration.slots?.[index]?.script || "";
+      const owner = adConfiguration.slots?.[index]?.owner || "";
+      el(`banner-owner-${index + 1}`).value = owner;
+      if (adConfiguration.slots?.[index]) ownerCounts[owner === "owner" || owner === "mateus" ? owner : "missing"]++;
     }
+    el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: você ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
   }
 
@@ -434,6 +486,32 @@
 
   el("refresh-admin")?.addEventListener("click", () => refreshAdmin().catch((error) => window.alert(error.message)));
 
+  document.querySelectorAll("[data-banner-preview]").forEach((button) => {
+    button.addEventListener("click", () => showAdPreview(button.dataset.bannerPreview));
+  });
+
+  el("reward-base-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    const amount = Number(el("reward-base-value").value);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 500) {
+      say(el("reward-base-message"), "Informe um valor entre R$ 0,00 e R$ 500,00.", true);
+      return;
+    }
+    button.disabled = true;
+    say(el("reward-base-message"), "Salvando valor-base…");
+    try {
+      const result = await api("admin-set-reward-base", { rewardBaseCents: Math.round(amount * 100) });
+      const notice = result.notificationSent ? "Aviso enviado à comunidade." : "O valor foi salvo, mas o aviso do WhatsApp não foi enviado; confira a integração do grupo.";
+      say(el("reward-base-message"), `Valor salvo: ${money(result.rewardBaseCents)} por mil visitas qualificadas. ${notice}`, !result.notificationSent);
+      await refreshAdmin();
+    } catch (error) {
+      say(el("reward-base-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   el("ad-config-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const button = event.currentTarget.querySelector('button[type="submit"]');
@@ -443,7 +521,7 @@
       const result = await api("admin-save-ad-configuration", {
         adsenseEnabled: el("adsense-primary").checked,
         adsenseTitle: el("adsense-title").value,
-        adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value }))
+        adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value, owner: el(`banner-owner-${index + 1}`).value }))
       });
       const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " Não foi possível enviar o aviso ao grupo; confira a conexão do WhatsApp.";
       say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) na página Guia. O redirecionamento permanece sem anúncios e sem espera.${groupNotice}`);
