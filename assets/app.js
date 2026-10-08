@@ -475,6 +475,7 @@
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);
     el("earnings-notification-fees").textContent = money(data.notificationFeesCents);
+    el("earnings-notification-bonus").textContent = money(data.notificationBonusCents);
     const notificationPreference = data.adRevenueNotifications || { enabled: false };
     const notificationsEnabled = Boolean(notificationPreference.enabled);
     el("ad-revenue-notification-consent").checked = false;
@@ -482,8 +483,10 @@
     el("enable-ad-revenue-notifications").hidden = notificationsEnabled;
     el("disable-ad-revenue-notifications").hidden = !notificationsEnabled;
     el("ad-revenue-notification-status").textContent = notificationsEnabled
-      ? `Ativo${notificationPreference.enabled_at ? ` desde ${date(notificationPreference.enabled_at)}` : ""}. Tarifa diária: R$ 0,01, cobrada após o envio do primeiro aviso do dia.`
-      : "Avisos desativados. Ative somente se aceitar a tarifa diária informada acima.";
+      ? `Ativo${notificationPreference.enabled_at ? ` desde ${date(notificationPreference.enabled_at)}` : ""}. Tarifa: R$ 0,01 por dia com envio; a primeira mensagem é grátis e desliga o serviço automaticamente.`
+      : notificationPreference.free_notice_sent_at
+      ? "Avisos desativados automaticamente após a primeira mensagem grátis. Para reativar, seu saldo disponível precisa ser maior que R$ 70,00."
+      : "Avisos desativados. A primeira mensagem é grátis, devolve R$ 0,01 ao saldo e desativa os avisos após o envio.";
     const chargesBody = el("ad-notification-charges-body");
     chargesBody.replaceChildren();
     const notificationCharges = data.notificationCharges || [];
@@ -492,7 +495,7 @@
     } else {
       for (const charge of notificationCharges) {
         const row = document.createElement("tr");
-        cell(row, dateOnly(charge.service_day)); cell(row, money(charge.amount_cents));
+        cell(row, dateOnly(charge.service_day)); cell(row, `${charge.kind || "Tarifa"} ${charge.kind === "Bônus da primeira mensagem" ? "+" : "−"}${money(charge.amount_cents)}`);
         chargesBody.append(row);
       }
     }

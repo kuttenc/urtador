@@ -358,18 +358,23 @@ async function profile(request: Request, payload: Payload) {
   const { data: withdrawals, error: withdrawalError } = await supabase.from("kutt_withdrawals")
     .select("id, amount_cents, pix_key, status, requested_at, processed_at, admin_note").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(20);
   if (withdrawalError) throw withdrawalError;
-  const [rewards, notificationCharges, notificationPreference, reservedCents] = await Promise.all([
+  const [rewards, notificationCharges, notificationPreference, reservedCents, notificationBonus] = await Promise.all([
     readRewardBalance(user.id),
     readNotificationChargeBalance(user.id),
     supabase.from("kutt_ad_notification_preferences")
-      .select("enabled, consent_version, enabled_at, disabled_at")
+      .select("enabled, consent_version, enabled_at, disabled_at, free_notice_sent_at")
       .eq("user_id", user.id).maybeSingle(),
-    readReservedWithdrawalCents(user.id)
+    readReservedWithdrawalCents(user.id),
+    readNotificationBonusBalance(user.id)
   ]);
   if (notificationPreference.error) throw notificationPreference.error;
   const rewardBaseCents = await currentRewardBaseCents();
-  const earnedCents = rewards.earnedCents - notificationCharges.totalCents;
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationCharges: notificationCharges.rows, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  const earnedCents = rewards.earnedCents - notificationCharges.totalCents + notificationBonus.totalCents;
+  const notificationLedger: Record<string, unknown>[] = [
+    ...notificationCharges.rows.map((row) => ({ ...row, kind: "Tarifa" })),
+    ...notificationBonus.rows.map((row: Record<string, unknown>) => ({ ...row, kind: "Bônus da primeira mensagem" }))
+  ].sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(b.service_day).localeCompare(String(a.service_day))).slice(0, 30);
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
 async function readReservedWithdrawalCents(userId: string) {
@@ -404,12 +409,33 @@ async function readNotificationChargeBalance(userId: string) {
   return { totalCents, rows: recentRows };
 }
 
+async function readNotificationBonusBalance(userId: string) {
+  const { data, error } = await supabase.from("kutt_ad_notification_credits")
+    .select("service_day, amount_cents, reason").eq("user_id", userId);
+  if (error) throw error;
+  const rows = data ?? [];
+  return { totalCents: rows.reduce((sum, row) => sum + Number(row.amount_cents || 0), 0), rows };
+}
+
 async function setAdRevenueNotificationPreference(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   if (typeof payload.enabled !== "boolean") throw new Error("Escolha ativar ou desativar os avisos.");
   const now = new Date().toISOString();
   if (payload.enabled) {
     if (payload.consent !== true) throw new Error("Confirme que leu e aceita a tarifa diária antes de ativar.");
+    const { data: existingPreference, error: preferenceError } = await supabase.from("kutt_ad_notification_preferences")
+      .select("free_notice_sent_at").eq("user_id", user.id).maybeSingle();
+    if (preferenceError) throw preferenceError;
+    if (existingPreference?.free_notice_sent_at) {
+      const [rewards, fees, bonus, reservedCents] = await Promise.all([
+        readRewardBalance(user.id),
+        readNotificationChargeBalance(user.id),
+        readNotificationBonusBalance(user.id),
+        readReservedWithdrawalCents(user.id)
+      ]);
+      const availableCents = rewards.earnedCents - fees.totalCents + bonus.totalCents - reservedCents;
+      if (availableCents <= 7000) throw new Error("Para reativar os avisos, seu saldo disponível precisa ser maior que R$ 70,00.");
+    }
     const { error } = await supabase.from("kutt_ad_notification_preferences").upsert({
       user_id: user.id,
       enabled: true,
@@ -420,7 +446,7 @@ async function setAdRevenueNotificationPreference(request: Request, payload: Pay
       updated_at: now
     }, { onConflict: "user_id" });
     if (error) throw error;
-    return { ok: true, enabled: true, message: "Avisos ativados. A tarifa é cobrada uma vez no dia em que pelo menos um aviso for enviado." };
+    return { ok: true, enabled: true, message: existingPreference?.free_notice_sent_at ? "Avisos reativados. A tarifa é de R$ 0,01 por dia em que ao menos um aviso for enviado." : "Primeiro aviso ativado: ele será gratuito, adicionará R$ 0,01 ao seu saldo e desligará os avisos automaticamente." };
   }
   const { error } = await supabase.from("kutt_ad_notification_preferences").upsert({
     user_id: user.id,
@@ -795,7 +821,7 @@ async function notifyCollaboratorGroup(message: string) {
 
 async function sendUserAdRevenueNotifications(rows: Record<string, unknown>[], reportStart: string, reportEnd: string, notifySlot: "08" | "20") {
   const { data: preferences, error } = await supabase.from("kutt_ad_notification_preferences")
-    .select("user_id, user:kutt_users!kutt_ad_notification_preferences_user_id_fkey(phone)")
+    .select("user_id, free_notice_sent_at, user:kutt_users!kutt_ad_notification_preferences_user_id_fkey(phone)")
     .eq("enabled", true);
   if (error) throw error;
   let sent = 0;
@@ -828,29 +854,49 @@ async function sendUserAdRevenueNotifications(rows: Record<string, unknown>[], r
         ? recent.map((item) => `📅 ${item.reportDate} · participação ${Number(item.participationPercent).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}% · parcela estimada ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: item.currencyCode, minimumFractionDigits: 6, maximumFractionDigits: 10 }).format(Number(item.userRevenueEstimateUsd))}`)
         : ["Ainda não há relatório diário da Adsterra para os últimos dias."];
       const totalEstimate = recent.reduce((sum, item) => sum + Number(item.userRevenueEstimateUsd || 0), 0);
-      const [rewardBalance, notificationBalance, withdrawalResponse] = await Promise.all([
+      const [rewardBalance, notificationBalance, bonusBalance, withdrawalResponse] = await Promise.all([
         readRewardBalance(String(preference.user_id)),
         readNotificationChargeBalance(String(preference.user_id)),
+        readNotificationBonusBalance(String(preference.user_id)),
         supabase.from("kutt_withdrawals").select("amount_cents, status").eq("user_id", preference.user_id).neq("status", "rejected")
       ]);
       if (withdrawalResponse.error) throw withdrawalResponse.error;
+      const firstFreeNotice = !preference.free_notice_sent_at;
       const alreadyChargedToday = notificationBalance.rows.some((charge) => charge.service_day === serviceDay);
-      const todayFeeCents = alreadyChargedToday ? 0 : 1;
-      const netBalanceCents = rewardBalance.earnedCents - notificationBalance.totalCents - todayFeeCents;
+      const todayFeeCents = firstFreeNotice || alreadyChargedToday ? 0 : 1;
+      const netBalanceCents = rewardBalance.earnedCents - notificationBalance.totalCents + bonusBalance.totalCents - todayFeeCents;
       const reservedCents = (withdrawalResponse.data ?? []).reduce((sum, item) => sum + Number(item.amount_cents || 0), 0);
-      const availableCents = netBalanceCents - reservedCents;
+      const availableCents = netBalanceCents - reservedCents + (firstFreeNotice ? 1 : 0);
       const withdrawalPrompt = availableCents >= 7000
-        ? `Quer solicitar um saque? Após a tarifa de hoje, seu saldo líquido disponível é ${formatMoney(availableCents)}. Abra ${publicBaseUrl} e escolha “Saque Pix”.`
-        : `Saldo líquido disponível para saque após a tarifa de hoje: ${formatMoney(Math.max(0, availableCents))}. O mínimo é R$ 70,00; abaixo disso o painel bloqueia a solicitação. Quando atingir o mínimo, abra ${publicBaseUrl} > “Saque Pix”.`;
-      const message = `📊 *Urtador · seu resumo de anúncios (${notifySlot}h)*\n\n${lines.join("\n")}\n\n💰 *Estimativa rateada do período:* ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: recent.at(-1)?.currencyCode || "USD", minimumFractionDigits: 6, maximumFractionDigits: 10 }).format(totalEstimate)}\n\n💳 *${withdrawalPrompt}*\n\nℹ️ A rede informa valores agregados; a parcela é estimada pela participação das suas visitas qualificadas e não confirma pagamento.\n🧾 Avisos: R$ 0,01 por dia em que pelo menos um aviso for enviado, cobrado no máximo uma vez no dia (mesmo com os avisos das 8h e 20h). O saldo líquido pode ficar negativo. Você pode desativar a qualquer momento no painel.`;
+        ? `Quer solicitar um saque? Seu saldo líquido disponível após esta mensagem é ${formatMoney(availableCents)}. Abra ${publicBaseUrl} e escolha “Saque Pix”.`
+        : `Saldo líquido disponível para saque após esta mensagem: ${formatMoney(Math.max(0, availableCents))}. O mínimo disponível é R$ 70,00; abaixo disso o painel bloqueia a solicitação. Quando atingir o mínimo, abra ${publicBaseUrl} > “Saque Pix”.`;
+      const firstNoticeCopy = firstFreeNotice
+        ? "🎁 Esta é sua primeira mensagem grátis. Adicionamos R$ 0,01 de bônus ao seu saldo e desligaremos os avisos automaticamente após o envio."
+        : "🧾 Avisos: R$ 0,01 por dia em que pelo menos um aviso for enviado, cobrado no máximo uma vez no dia (mesmo com os avisos das 8h e 20h). O saldo líquido pode ficar negativo. Você pode desativar a qualquer momento no painel.";
+      const message = `📊 *Urtador · seu resumo de anúncios (${notifySlot}h)*\n\n${lines.join("\n")}\n\n💰 *Estimativa rateada do período:* ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: recent.at(-1)?.currencyCode || "USD", minimumFractionDigits: 6, maximumFractionDigits: 10 }).format(totalEstimate)}\n\n💳 *${withdrawalPrompt}*\n\nℹ️ A rede informa valores agregados; a parcela é estimada pela participação das suas visitas qualificadas e não confirma pagamento.\n${firstNoticeCopy}`;
       await sendWhatsApp(phone, message);
-      const { error: chargeError } = await supabase.from("kutt_ad_notification_charges").upsert({
-        user_id: preference.user_id,
-        service_day: serviceDay,
-        amount_cents: 1,
-        delivery_id: delivery.id
-      }, { onConflict: "user_id,service_day", ignoreDuplicates: true });
-      if (chargeError) throw chargeError;
+      if (firstFreeNotice) {
+        const { error: creditError } = await supabase.from("kutt_ad_notification_credits").upsert({
+          user_id: preference.user_id,
+          service_day: serviceDay,
+          amount_cents: 1,
+          reason: "first_free_notice_bonus",
+          delivery_id: delivery.id
+        }, { onConflict: "user_id,reason", ignoreDuplicates: true });
+        if (creditError) throw creditError;
+        const { error: disableError } = await supabase.from("kutt_ad_notification_preferences")
+          .update({ enabled: false, free_notice_sent_at: new Date().toISOString(), disabled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq("user_id", preference.user_id);
+        if (disableError) throw disableError;
+      } else {
+        const { error: chargeError } = await supabase.from("kutt_ad_notification_charges").upsert({
+          user_id: preference.user_id,
+          service_day: serviceDay,
+          amount_cents: 1,
+          delivery_id: delivery.id
+        }, { onConflict: "user_id,service_day", ignoreDuplicates: true });
+        if (chargeError) throw chargeError;
+      }
       const { error: markSentError } = await supabase.from("kutt_ad_notification_deliveries")
         .update({ status: "sent", sent_at: new Date().toISOString(), error_message: null }).eq("id", delivery.id);
       if (markSentError) throw markSentError;
