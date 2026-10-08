@@ -43,6 +43,7 @@ $secretLines = @(
 )
 if ($kutt['OWNER_PHONE']) { $secretLines += "OWNER_PHONE=$($kutt['OWNER_PHONE'])" }
 if ($kutt['KUTT_AD_NOTIFICATION_GROUP_ID']) { $secretLines += "KUTT_AD_NOTIFICATION_GROUP_ID=$($kutt['KUTT_AD_NOTIFICATION_GROUP_ID'])" }
+if ($kutt['KUTT_REPORT_CRON_SECRET']) { $secretLines += "KUTT_REPORT_CRON_SECRET=$($kutt['KUTT_REPORT_CRON_SECRET'])" }
 $greenApiNames = @('GREEN_API_URL', 'GREEN_API_INSTANCE_ID', 'GREEN_API_TOKEN')
 $configuredGreenApiNames = @($greenApiNames | Where-Object { $kutt[$_] })
 if ($configuredGreenApiNames.Count -gt 0 -and $configuredGreenApiNames.Count -ne $greenApiNames.Count) {

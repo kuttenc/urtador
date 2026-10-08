@@ -21,6 +21,7 @@ type Payload = {
   impressions?: number;
   clicks?: number;
   revenueCents?: number;
+  announce?: boolean;
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -49,6 +50,7 @@ const adsenseOAuthClientSecret = Deno.env.get("ADSENSE_OAUTH_CLIENT_SECRET") ?? 
 const adsensePublisherId = Deno.env.get("ADSENSE_PUBLISHER_ID") ?? "pub-6464589391694014";
 const adsterraApiToken = Deno.env.get("ADSTERRA_API_TOKEN") ?? "";
 const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? "").replace(/@g\.us$/i, "");
+const reportCronSecret = Deno.env.get("KUTT_REPORT_CRON_SECRET") ?? "";
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -668,6 +670,69 @@ async function notifyCollaboratorGroup(message: string) {
   }
 }
 
+async function sendScheduledAdsterraReport(request: Request, announce = false) {
+  const suppliedSecret = request.headers.get("x-kutt-report-secret") ?? "";
+  if (!reportCronSecret || !secureEqual(suppliedSecret, reportCronSecret)) {
+    return json(request, 401, { error: "Acesso não autorizado." });
+  }
+  if (!adsterraApiToken) throw new Error("A chave da API Adsterra não está configurada.");
+  const todayParts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(new Date()).map((part) => [part.type, part.value]));
+  const today = `${todayParts.year}-${todayParts.month}-${todayParts.day}`;
+  const endDate = new Date(`${today}T00:00:00Z`);
+  const startDate = new Date(endDate.getTime() - 6 * 86400000);
+  const start = startDate.toISOString().slice(0, 10);
+  const statsUrl = new URL("https://api3.adsterratools.com/publisher/stats.json");
+  statsUrl.searchParams.set("start_date", start);
+  statsUrl.searchParams.set("finish_date", today);
+  statsUrl.searchParams.set("group_by", "date");
+  const statsResponse = await fetch(statsUrl, { headers: { Accept: "application/json", "X-API-Key": adsterraApiToken } });
+  const statsData = await statsResponse.json().catch(() => null);
+  if (!statsResponse.ok) throw new Error(`A API Adsterra respondeu com erro ${statsResponse.status}.`);
+  const apiRows = Array.isArray(statsData) ? statsData : (statsData?.items ?? statsData?.data ?? statsData?.stats ?? statsData?.result ?? []);
+  if (!Array.isArray(apiRows)) throw new Error("A API Adsterra devolveu um formato inesperado.");
+  const rows = apiRows.map((entry: Record<string, unknown>) => {
+    const fields = Object.fromEntries(Object.entries(entry).map(([key, value]) => [key.toLowerCase(), value]));
+    const reportDate = validReportDay(fields.date ?? fields.day);
+    const metric = (value: unknown, label: string) => {
+      const parsed = Number(String(value ?? "0").replace(",", "."));
+      if (!Number.isFinite(parsed) || parsed < 0) throw new Error(`A API Adsterra retornou ${label} inválido.`);
+      return parsed;
+    };
+    const impressions = Math.round(metric(fields.impressions ?? fields.impression, "impressões"));
+    const clicks = Math.round(metric(fields.clicks, "cliques"));
+    const ctr = metric(fields.ctr, "CTR");
+    const cpm = metric(fields.cpm, "CPM");
+    const revenue = metric(fields.revenue, "receita");
+    if (reportDate < start || reportDate > today || ctr > 100) throw new Error("A API Adsterra retornou uma métrica fora do intervalo.");
+    return { provider: "adsterra", report_date: reportDate, impressions, clicks, ctr, cpm, revenue_cents: Math.round(revenue * 100), currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString() };
+  }).sort((left, right) => left.report_date.localeCompare(right.report_date));
+  if (rows.length) {
+    const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
+    if (error) throw error;
+  }
+  const activeRows = rows.filter((row) => row.impressions > 0 || row.clicks > 0);
+  const dayLabel = (value: string) => {
+    const weekday = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+    const shortDate = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
+    return `${weekday.replace(".", "")} ${shortDate}`;
+  };
+  const decimal = (value: number, digits = 3) => value.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: 6 });
+  const lines = activeRows.length
+    ? activeRows.map((row) => `📅 ${dayLabel(row.report_date)} · ${row.impressions} imp. · ${row.clicks} cliques · CTR ${decimal(row.ctr)}% · CPM US$ ${decimal(row.cpm)} / mil · receita US$ ${(row.revenue_cents / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+    : ["Ainda não há impressões ou cliques reportados nesse período."];
+  const now = new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }).format(new Date());
+  const introduction = announce ? "✅ O painel agora traz CTR e CPM da API oficial, separados da receita. Este resumo semanal será enviado automaticamente todos os dias às 8h e às 20h (horário de Brasília).\n\n" : "";
+  const message = `📊 *Urtador · Relatório Adsterra — últimos 7 dias*\n${introduction}🕒 Atualizado: ${now} (Brasília)\n${lines.join("\n")}\n\nCPM é a métrica por mil impressões. A receita é o valor informado separadamente pela API e pode ser ajustada pela rede.`;
+  const notificationSent = await notifyCollaboratorGroup(message);
+  if (!notificationSent) throw new Error("O relatório foi consultado, mas não foi possível enviá-lo à comunidade. Confira a integração Green API do Urtador.");
+  return json(request, 200, { ok: true, imported: rows.length, notificationSent: true });
+}
+
 async function readAdConfiguration() {
   const { data, error } = await supabase.from("kutt_ad_configuration")
     .select("adsense_enabled, adsense_title, adsterra_slots, reward_base_cents").eq("id", true).maybeSingle();
@@ -939,6 +1004,7 @@ Deno.serve(async (request) => {
   if (!supabaseUrl || !serviceRoleKey || !otpPepper) return json(request, 500, { error: "Backend sem configuração completa." });
   try {
     const payload = await request.json() as Payload;
+    if (payload.action === "scheduled-adsterra-report") return await sendScheduledAdsterraReport(request, payload.announce === true);
     switch (payload.action) {
       case "request-otp": return json(request, 200, await requestOtp(request, payload));
       case "request-password-recovery": return json(request, 200, await requestPasswordRecovery(request, payload));
