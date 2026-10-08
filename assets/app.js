@@ -426,33 +426,32 @@
     const payoutPercent = Number(data.user.payoutPercent ?? 100);
     const rewardBaseCents = Number(data.rewardBaseCents ?? 7000);
     el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(rewardBaseCents * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
-    const siteAdBody = el("site-ad-report-body");
-    siteAdBody.replaceChildren();
-    const siteAdRows = data.siteAdMetrics || [];
-    if (siteAdRows.length === 0) {
-      const row = document.createElement("tr");
-      const empty = document.createElement("td"); empty.colSpan = 5; empty.textContent = "Ainda não há relatório Adsterra disponível para estes dias."; row.append(empty); siteAdBody.append(row);
-    }
-    for (const report of siteAdRows) {
-      const row = document.createElement("tr");
-      cell(row, dateOnly(report.report_date));
-      cell(row, Number(report.impressions || 0).toLocaleString("pt-BR"));
-      cell(row, Number(report.clicks || 0).toLocaleString("pt-BR"));
-      cell(row, report.ctr === null || report.ctr === undefined ? "—" : `${Number(report.ctr).toLocaleString("pt-BR", { maximumFractionDigits: 3 })}%`);
-      const cpm = report.cpm === null || report.cpm === undefined ? "—" : `${new Intl.NumberFormat("pt-BR", { style: "currency", currency: report.currency_code || "USD", minimumFractionDigits: 3, maximumFractionDigits: 6 }).format(Number(report.cpm))} / mil`;
-      cell(row, cpm);
-      siteAdBody.append(row);
-    }
     el("pix-key").value = data.user.pixKey || "";
     const linksBody = el("links-body");
     linksBody.replaceChildren();
-    for (const link of data.links || []) {
+    const earningsLinksBody = el("earnings-links-body");
+    earningsLinksBody.replaceChildren();
+    const userLinks = data.links || [];
+    if (userLinks.length === 0) {
+      for (const body of [linksBody, earningsLinksBody]) {
+        const emptyRow = document.createElement("tr");
+        const emptyCell = document.createElement("td"); emptyCell.colSpan = 4; emptyCell.textContent = "Você ainda não criou links nesta conta."; emptyRow.append(emptyCell); body.append(emptyRow);
+      }
+    }
+    for (const link of userLinks) {
       const row = document.createElement("tr");
       cell(row, link.title || link.slug);
       const linkCell = document.createElement("td"); linkCell.append(safeLink(`${config.defaultDomain}/${link.slug}`, `${config.defaultDomain}/${link.slug}`)); row.append(linkCell);
       cell(row, Number(link.qualified_click_count || 0).toLocaleString("pt-BR"));
       cell(row, date(link.created_at));
       linksBody.append(row);
+
+      const earningsRow = document.createElement("tr");
+      cell(earningsRow, link.title || link.slug);
+      const earningsLinkCell = document.createElement("td"); earningsLinkCell.append(safeLink(`${config.defaultDomain}/${link.slug}`, `${config.defaultDomain}/${link.slug}`)); earningsRow.append(earningsLinkCell);
+      cell(earningsRow, Number(link.qualified_click_count || 0).toLocaleString("pt-BR"));
+      cell(earningsRow, date(link.created_at));
+      earningsLinksBody.append(earningsRow);
     }
     const withdrawalsBody = el("withdrawals-body");
     withdrawalsBody.replaceChildren();
