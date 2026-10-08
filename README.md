@@ -35,6 +35,12 @@ Depois, com o Supabase CLI autenticado em uma conta que tenha acesso ao projeto 
 npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctieacvbbwim --no-verify-jwt
 ```
 
+## Avisos na comunidade do WhatsApp
+
+Para avisos do Urtador, usar a instância Green API de fallback do Validade PT260 definida no `.env` local (`GREEN_API_FALLBACK_URL`, `GREEN_API_FALLBACK_INSTANCE_ID`, `GREEN_API_FALLBACK_TOKEN`); o código do chatbot Validade também prioriza essa instância. Não usar as credenciais primárias de logística nem copiar tokens para este repositório. O grupo Kuttencurtador tem o ID `120363430513969812@g.us`.
+
+Antes de enviar, consultar `getGroupData` nessa instância com o ID acima e conferir que o grupo retornado é **Kuttencurtador** e que a instância pode publicar. Depois enviar o texto pelo endpoint `sendMessage` com `chatId` igual ao mesmo ID. Não imprimir URLs com token, valores de tokens, lista de membros nem mensagens privadas nos logs. O envio de 7 de outubro de 2026 confirmou o grupo e foi concluído com sucesso.
+
 As migrações SQL criam as tabelas e políticas necessárias. A migração `202610070007_kutt_atomic_qualified_clicks.sql` mantém o contador confiável e grava clique, saldo e deduplicação numa transação única; aplique-a antes de publicar a Edge Function atualizada.
 
 Links podem ser criados sem cadastro. Um identificador aleatório do navegador é guardado localmente; depois do login no mesmo navegador, a função anexa os links anônimos à conta. O backend guarda somente o hash desse identificador e o hash do IP de criação (para prevenção de abuso); não usa o IP para identificar a conta. A migração `202610070006_guest_link_sessions.sql` adiciona o campo necessário.
