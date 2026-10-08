@@ -13,6 +13,7 @@
     adminUsers: [],
     adminLinks: [],
     adminAdRevenueRows: [],
+    personalAdRevenueRows: [],
     adminReport: null,
     rewardBaseCents: 7000,
     user: null,
@@ -93,6 +94,10 @@
     return `${year}-${month}-${day}`;
   }
 
+  function adRevenuePrecise(value, currency = "USD") {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency, minimumFractionDigits: 6, maximumFractionDigits: 10 }).format(Number(value) || 0);
+  }
+
   function convertAdRevenueCents(cents, sourceCurrency, targetCurrency) {
     const value = Number(cents) || 0;
     if (sourceCurrency === targetCurrency) return value;
@@ -100,6 +105,25 @@
     if (sourceCurrency === "USD" && targetCurrency === "BRL") return Math.round(value * state.usdBrlRate);
     if (sourceCurrency === "BRL" && targetCurrency === "USD") return Math.round(value / state.usdBrlRate);
     return value;
+  }
+
+  function convertAdRevenueAmount(amount, sourceCurrency, targetCurrency) {
+    const value = Number(amount) || 0;
+    if (sourceCurrency === targetCurrency || !(state.usdBrlRate > 0)) return value;
+    if (sourceCurrency === "USD" && targetCurrency === "BRL") return value * state.usdBrlRate;
+    if (sourceCurrency === "BRL" && targetCurrency === "USD") return value / state.usdBrlRate;
+    return value;
+  }
+
+  function adRevenueAmount(item) {
+    const precise = Number(item.revenue_amount || 0);
+    if (precise > 0) return { amount: precise, cpmEstimate: false };
+    const legacy = Number(item.revenue_cents || 0) / 100;
+    if (legacy > 0) return { amount: legacy, cpmEstimate: false };
+    if (item.provider === "adsterra" && Number(item.cpm || 0) > 0 && Number(item.impressions || 0) > 0) {
+      return { amount: Number(item.cpm) * Number(item.impressions) / 1000, cpmEstimate: true };
+    }
+    return { amount: 0, cpmEstimate: false };
   }
 
   function renderAdRevenueFxStatus(message = "") {
@@ -154,13 +178,13 @@
       for (const row of providerRows) {
         const originalCurrency = row.currency_code || "BRL";
         const currency = state.usdBrlRate > 0 ? targetCurrency : originalCurrency;
-        const amount = state.usdBrlRate > 0 ? convertAdRevenueCents(row.revenue_cents, originalCurrency, targetCurrency) : Number(row.revenue_cents || 0);
+        const amount = convertAdRevenueAmount(adRevenueAmount(row).amount, originalCurrency, currency);
         revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + amount);
       }
       const prefix = provider === "adsense" ? "adsense" : "adsterra";
       el(`${prefix}-revenue-traffic`).textContent = `${totals.impressions.toLocaleString("pt-BR")} / ${totals.clicks.toLocaleString("pt-BR")}`;
       const currencies = [...revenueByCurrency.entries()].sort(([a], [b]) => a.localeCompare(b));
-      el(`${prefix}-revenue-total`).textContent = currencies.length ? currencies.map(([currency, cents]) => money(cents, currency)).join(" · ") : money(0, state.usdBrlRate > 0 ? targetCurrency : provider === "adsense" ? "BRL" : "USD");
+      el(`${prefix}-revenue-total`).textContent = currencies.length ? currencies.map(([currency, amount]) => adRevenuePrecise(amount, currency)).join(" · ") : adRevenuePrecise(0, state.usdBrlRate > 0 ? targetCurrency : provider === "adsense" ? "BRL" : "USD");
     }
     const body = el("admin-ad-revenue-body");
     body.replaceChildren();
@@ -176,9 +200,11 @@
       cell(row, cpm);
       const originalCurrency = item.currency_code || "BRL";
       const displayCurrency = state.usdBrlRate > 0 ? targetCurrency : originalCurrency;
-      const displayCents = state.usdBrlRate > 0 ? convertAdRevenueCents(item.revenue_cents, originalCurrency, targetCurrency) : Number(item.revenue_cents || 0);
-      cell(row, money(displayCents, displayCurrency));
-      cell(row, item.source === "adsense_api" ? "API oficial do AdSense" : item.source === "adsterra_api" ? "API oficial Adsterra" : "Informado no painel");
+      const revenue = adRevenueAmount(item);
+      const displayAmount = convertAdRevenueAmount(revenue.amount, originalCurrency, displayCurrency);
+      cell(row, adRevenuePrecise(displayAmount, displayCurrency));
+      const sourceLabel = item.source === "adsense_api" ? "API oficial do AdSense" : item.source === "adsterra_api" ? "API oficial Adsterra" : "Informado no painel";
+      cell(row, revenue.cpmEstimate ? `${sourceLabel} · estimado pelo CPM` : sourceLabel);
       body.append(row);
     }
   }
@@ -386,6 +412,40 @@
     return true;
   }
 
+  async function loadPersonalAdRevenueReport(showMessage = true) {
+    const start = el("personal-ad-report-start")?.value;
+    const end = el("personal-ad-report-end")?.value;
+    if (!start || !end) return;
+    const button = el("personal-ad-report-form")?.querySelector("button[type='submit']");
+    if (button) button.disabled = true;
+    if (showMessage) say(el("personal-ad-report-message"), "Consultando seu rateio estimado…");
+    try {
+      const result = await api("my-ad-revenue-report", { reportStart: start, reportEnd: end });
+      state.personalAdRevenueRows = result.rows || [];
+      const body = el("personal-ad-report-body");
+      body.replaceChildren();
+      if (state.personalAdRevenueRows.length === 0) {
+        const row = document.createElement("tr");
+        const empty = document.createElement("td"); empty.colSpan = 5; empty.textContent = "Ainda não há relatório diário da Adsterra para esse período."; row.append(empty); body.append(row);
+      }
+      for (const item of state.personalAdRevenueRows) {
+        const row = document.createElement("tr");
+        cell(row, dateOnly(item.reportDate));
+        cell(row, `${Number(item.userVisits || 0).toLocaleString("pt-BR")} / ${Number(item.totalVisits || 0).toLocaleString("pt-BR")}`);
+        cell(row, `${Number(item.participationPercent || 0).toLocaleString("pt-BR", { maximumFractionDigits: 6 })}%`);
+        cell(row, adRevenuePrecise(item.userRevenueEstimateUsd, item.currencyCode || "USD"));
+        cell(row, item.estimateSource === "API Adsterra" ? "Receita informada pela API" : "Estimativa derivada do CPM");
+        body.append(row);
+      }
+      el("export-personal-ad-report").disabled = state.personalAdRevenueRows.length === 0;
+      if (showMessage) say(el("personal-ad-report-message"), `Relatório carregado: ${state.personalAdRevenueRows.length} dia(s). ${result.note || ""}`);
+    } catch (error) {
+      say(el("personal-ad-report-message"), error.message, true);
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   async function refreshDashboard() {
     let data = await api("me");
     if (state.guestClaimedToken !== state.token) {
@@ -460,6 +520,14 @@
       cell(row, date(item.requested_at)); cell(row, money(item.amount_cents)); cell(row, item.status === "pending" ? "Aguardando conferência" : item.status === "approved" ? "Aprovado para pagamento" : item.status === "paid" ? "Pago" : "Recusado");
       withdrawalsBody.append(row);
     }
+    if (!el("personal-ad-report-start").value || !el("personal-ad-report-end").value) {
+      const end = new Date();
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      el("personal-ad-report-start").value = localDateInputValue(start);
+      el("personal-ad-report-end").value = localDateInputValue(end);
+    }
+    await loadPersonalAdRevenueReport(false);
     if (data.user.role === "admin") await refreshAdmin();
     resumePendingLink();
   }
@@ -1129,6 +1197,21 @@
     const blob = new Blob([`\uFEFF${lines.map((line) => line.map(quote).join(",")).join("\r\n")}`], { type: "text/csv;charset=utf-8" });
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a"); anchor.href = href; anchor.download = "urtador-relatorio-repasses.csv"; anchor.click();
+    URL.revokeObjectURL(href);
+  });
+
+  el("personal-ad-report-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await loadPersonalAdRevenueReport(true);
+  });
+
+  el("export-personal-ad-report")?.addEventListener("click", () => {
+    const columns = ["data", "visitas_qualificadas_usuario", "visitas_qualificadas_site", "participacao_percentual", "parcela_estimada", "moeda", "origem_estimativa"];
+    const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+    const lines = [columns, ...state.personalAdRevenueRows.map((row) => [row.reportDate, row.userVisits, row.totalVisits, row.participationPercent, Number(row.userRevenueEstimateUsd || 0).toFixed(10), row.currencyCode || "USD", row.estimateSource])];
+    const blob = new Blob([`\uFEFF${lines.map((line) => line.map(quote).join(",")).join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a"); anchor.href = href; anchor.download = "urtador-minha-estimativa-adsterra.csv"; anchor.click();
     URL.revokeObjectURL(href);
   });
 

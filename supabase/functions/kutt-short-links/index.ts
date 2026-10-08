@@ -361,6 +361,55 @@ async function profile(request: Request, payload: Payload) {
   return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
+async function personalAdRevenueReport(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload);
+  const start = validReportDay(payload.reportStart);
+  const end = validReportDay(payload.reportEnd);
+  const daySpan = (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000;
+  if (start > end || daySpan > 366) throw new Error("Escolha um período de até 367 dias.");
+
+  const [{ data: shares, error: shareError }, { data: reports, error: reportError }] = await Promise.all([
+    supabase.rpc("kutt_ad_revenue_daily_visit_share", { target_user_id: user.id, start_day: start, end_day: end }),
+    supabase.from("kutt_ad_revenue_reports")
+      .select("report_date, impressions, cpm, revenue_cents, revenue_amount, currency_code")
+      .eq("provider", "adsterra").gte("report_date", start).lte("report_date", end).order("report_date", { ascending: true })
+  ]);
+  if (shareError) throw shareError;
+  if (reportError) throw reportError;
+
+  const shareByDay = new Map((shares ?? []).map((row: Record<string, unknown>) => [String(row.report_date).slice(0, 10), row]));
+  const rows = (reports ?? []).map((report: Record<string, unknown>) => {
+    const day = String(report.report_date).slice(0, 10);
+    const share = shareByDay.get(day) as Record<string, unknown> | undefined;
+    const userVisits = Number(share?.user_visits ?? 0);
+    const totalVisits = Number(share?.total_visits ?? 0);
+    const participation = totalVisits > 0 ? userVisits / totalVisits : 0;
+    const storedAmount = Number(report.revenue_amount ?? 0);
+    const legacyAmount = Number(report.revenue_cents ?? 0) / 100;
+    const cpm = Number(report.cpm ?? 0);
+    const impressions = Number(report.impressions ?? 0);
+    const hasStoredAmount = storedAmount > 0 || legacyAmount > 0;
+    const siteRevenueUsd = hasStoredAmount ? (storedAmount || legacyAmount) : (cpm * impressions) / 1000;
+    return {
+      reportDate: day,
+      userVisits,
+      totalVisits,
+      participationPercent: Number((participation * 100).toFixed(6)),
+      siteRevenueUsd: Number(siteRevenueUsd.toFixed(10)),
+      userRevenueEstimateUsd: Number((siteRevenueUsd * participation).toFixed(10)),
+      estimateSource: hasStoredAmount ? "API Adsterra" : "Estimativa derivada do CPM e das impressões",
+      currencyCode: String(report.currency_code ?? "USD")
+    };
+  });
+  return {
+    ok: true,
+    start,
+    end,
+    rows,
+    note: "Estimativa proporcional às visitas qualificadas registradas por conta e dia. A Adsterra fornece dados agregados e não identifica receita por usuário ou link; este rateio não altera o saldo interno nem confirma pagamento."
+  };
+}
+
 async function readRewardBalance(userId: string) {
   const pageSize = 1000;
   let visitCount = 0;
@@ -709,7 +758,7 @@ async function sendScheduledAdsterraReport(request: Request, announce = false) {
     const cpm = metric(fields.cpm, "CPM");
     const revenue = metric(fields.revenue, "receita");
     if (reportDate < start || reportDate > today || ctr > 100) throw new Error("A API Adsterra retornou uma métrica fora do intervalo.");
-    return { provider: "adsterra", report_date: reportDate, impressions, clicks, ctr, cpm, revenue_cents: Math.round(revenue * 100), currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString() };
+    return { provider: "adsterra", report_date: reportDate, impressions, clicks, ctr, cpm, revenue_cents: Math.round(revenue * 100), revenue_amount: revenue, currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString() };
   }).sort((left, right) => left.report_date.localeCompare(right.report_date));
   if (rows.length) {
     const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
@@ -761,7 +810,7 @@ async function adminAction(request: Request, payload: Payload) {
       throw new Error("O período precisa estar em ordem e ter no máximo 367 dias.");
     }
     const { data, error } = await supabase.from("kutt_ad_revenue_reports")
-      .select("provider, report_date, impressions, clicks, ctr, cpm, revenue_cents, currency_code, source, updated_at")
+      .select("provider, report_date, impressions, clicks, ctr, cpm, revenue_cents, revenue_amount, currency_code, source, updated_at")
       .gte("report_date", start).lte("report_date", end).order("report_date", { ascending: false });
     if (error) throw error;
     return { ok: true, rows: data ?? [], start, end };
@@ -785,6 +834,7 @@ async function adminAction(request: Request, payload: Payload) {
       impressions,
       clicks,
       revenue_cents: revenueCents,
+      revenue_amount: revenueCents / 100,
       currency_code: "BRL",
       source: "official_dashboard",
       updated_at: new Date().toISOString(),
@@ -845,7 +895,7 @@ async function adminAction(request: Request, payload: Payload) {
       const earnings = Number(values[indexFor("ESTIMATED_EARNINGS")]);
       const revenueCents = Math.round(earnings * 100);
       if (![impressions, clicks, revenueCents].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("O relatório trouxe números inválidos; nada foi gravado.");
-      return { provider: "adsense", report_date: reportDate, impressions, clicks, revenue_cents: revenueCents, currency_code: "BRL", source: "adsense_api", updated_at: new Date().toISOString(), updated_by: user.id };
+      return { provider: "adsense", report_date: reportDate, impressions, clicks, revenue_cents: revenueCents, revenue_amount: earnings, currency_code: "BRL", source: "adsense_api", updated_at: new Date().toISOString(), updated_by: user.id };
     });
     if (rows.length) {
       const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
@@ -885,7 +935,7 @@ async function adminAction(request: Request, payload: Payload) {
       const revenue = numberValue(fields.revenue, "receita");
       const revenueCents = Math.round(revenue * 100);
       if (reportDate < start || reportDate > end || ![impressions, clicks, revenueCents].every(Number.isSafeInteger) || ctr > 100) throw new Error("A API Adsterra retornou um dia ou valor fora do intervalo; nada foi gravado.");
-      return { provider: "adsterra", report_date: reportDate, impressions, clicks, ctr, cpm, revenue_cents: revenueCents, currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString(), updated_by: user.id };
+      return { provider: "adsterra", report_date: reportDate, impressions, clicks, ctr, cpm, revenue_cents: revenueCents, revenue_amount: revenue, currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString(), updated_by: user.id };
     });
     if (rows.length) {
       const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
@@ -1012,6 +1062,7 @@ Deno.serve(async (request) => {
       case "login-password": return json(request, 200, await loginWithPassword(request, payload));
       case "set-password": return json(request, 200, await setPassword(request, payload));
       case "me": return json(request, 200, await profile(request, payload));
+      case "my-ad-revenue-report": return json(request, 200, await personalAdRevenueReport(request, payload));
       case "create": return json(request, 200, await createLink(request, payload));
       case "claim-guest-links": return json(request, 200, await claimGuestLinks(request, payload));
       case "resolve": return json(request, 200, await resolveLink(request, payload));
