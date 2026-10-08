@@ -567,6 +567,10 @@
 
   el("refresh-admin")?.addEventListener("click", () => refreshAdmin().catch((error) => window.alert(error.message)));
 
+  const adminSections = [...document.querySelectorAll("#admin-panel details.admin-section")];
+  el("admin-expand-all")?.addEventListener("click", () => adminSections.forEach((section) => { section.open = true; }));
+  el("admin-collapse-all")?.addEventListener("click", () => adminSections.forEach((section) => { section.open = false; }));
+
   document.querySelectorAll("[data-banner-preview]").forEach((button) => {
     button.addEventListener("click", () => showAdPreview(button.dataset.bannerPreview));
   });

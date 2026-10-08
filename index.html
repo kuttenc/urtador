@@ -151,10 +151,17 @@
                       <article class="balance-card"><span>Pix aguardando pagamento</span><strong id="admin-pending-pix">—</strong></article>
                       <article class="balance-card"><span>Pix já pagos</span><strong id="admin-paid-pix">—</strong></article>
                     </div>
-                    <h4>Atividade registrada — últimos 14 dias</h4>
+                    <div class="admin-section-controls" role="group" aria-label="Controles das seções do painel">
+                      <button id="admin-expand-all" class="button secondary small" type="button">Expandir tudo</button>
+                      <button id="admin-collapse-all" class="button secondary small" type="button">Recolher tudo</button>
+                    </div>
+                    <details class="admin-section">
+                      <summary><span>Atividade — últimos 14 dias</span><span class="admin-section-toggle">Abrir</span></summary>
                     <p class="field-help">Visitas e solicitações vêm dos registros do Supabase. “Pix em aberto” soma solicitações aguardando conferência ou pagamento; não é uma previsão de receita de anúncios.</p>
                     <div class="table-wrap"><table><thead><tr><th>Data</th><th>Visitas qualificadas</th><th>Solicitações Pix · total</th><th>Pix em aberto</th><th>Pix pagos</th></tr></thead><tbody id="admin-daily-body"></tbody></table></div>
-                    <h4>Relatório de repasses</h4>
+                    </details>
+                    <details class="admin-section">
+                      <summary><span>Relatório de repasses</span><span class="admin-section-toggle">Abrir</span></summary>
                     <p class="field-help">Consulte por dia, semana ou mês. “Repasse estimado” segue a regra interna registrada por visita; “Pix pagos” soma somente pagamentos marcados como realizados no painel. Isso não é receita real do Adsterra ou do AdSense.</p>
                     <form id="admin-report-form" class="ad-config-form">
                       <div class="ad-code-grid admin-report-filters">
@@ -180,12 +187,26 @@
                       <article class="balance-card"><span>Reserva potencial em 30 dias</span><strong id="forecast-month">R$ 0,00</strong></article>
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Período</th><th>Gerador</th><th>Visitas qualificadas</th><th>Repasse estimado</th><th>Pix pagos</th><th>Pix em aberto</th></tr></thead><tbody id="admin-report-body"></tbody></table></div>
-                    <h4>Solicitações Pix</h4><div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
-                    <h4>Valor-base interno por mil visitas</h4><p class="field-help">Este é o valor de repasse do Urtador para visitas qualificadas; não é o CPM nem a receita real de anúncios. A mudança vale para visitas futuras. Cada registro guarda o valor vigente na data.</p>
+                    </details>
+                    <details class="admin-section">
+                      <summary><span>Solicitações Pix</span><span class="admin-section-toggle">Abrir</span></summary>
+                      <div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
+                    </details>
+                    <details class="admin-section">
+                      <summary><span>Valor-base interno por mil visitas</span><span class="admin-section-toggle">Abrir</span></summary>
+                    <p class="field-help">Este é o valor de repasse do Urtador para visitas qualificadas; não é o CPM nem a receita real de anúncios. A mudança vale para visitas futuras. Cada registro guarda o valor vigente na data.</p>
                     <form id="reward-base-form" class="ad-config-form"><label class="field"><span>Valor-base (R$ por 1.000 visitas qualificadas)</span><input id="reward-base-value" type="number" min="0" max="500" step="0.01" required></label><button class="button" type="submit">Salvar valor-base</button><p id="reward-base-message" class="message" aria-live="polite"></p></form>
-                    <h4>Usuários e repasse</h4><p class="field-help">Ajuste o percentual do valor-base para cada conta. O valor estimado por mil visitas aparece junto ao campo; mudanças valem para visitas futuras.</p><div class="table-wrap admin-users-wrap"><table class="admin-users-table"><thead><tr><th>Conta</th><th>Repasse por 1.000 visitas</th><th>Ação</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
-                    <h4>Links criados</h4><div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Cliques únicos</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
-                    <h4>Publicidade em conteúdo</h4>
+                    </details>
+                    <details class="admin-section">
+                      <summary><span>Usuários e repasse</span><span class="admin-section-toggle">Abrir</span></summary>
+                      <p class="field-help">Ajuste o percentual do valor-base para cada conta. O valor estimado por mil visitas aparece junto ao campo; mudanças valem para visitas futuras.</p><div class="table-wrap admin-users-wrap"><table class="admin-users-table"><thead><tr><th>Conta</th><th>Repasse por 1.000 visitas</th><th>Ação</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
+                    </details>
+                    <details class="admin-section">
+                      <summary><span>Links criados</span><span class="admin-section-toggle">Abrir</span></summary>
+                      <div class="table-wrap"><table><thead><tr><th>Usuário</th><th>Link</th><th>Destino</th><th>Cliques únicos</th></tr></thead><tbody id="admin-links-body"></tbody></table></div>
+                    </details>
+                    <details class="admin-section">
+                      <summary><span>Publicidade em conteúdo</span><span class="admin-section-toggle">Abrir</span></summary>
                     <p class="field-help">O Adsterra pode exibir banners rotativos na página Guia e na etapa 2/2 do redirecionamento. O anúncio aparece em uma área própria; abrir o destino não depende de ver ou clicar nele. O Google AdSense permanece em espera até a aprovação do site. Os campos de titular organizam os banners, não apuram receita real.</p>
                     <p id="ad-owner-summary" class="field-help" aria-live="polite">A titularidade será resumida aqui após carregar os anúncios salvos.</p>
                     <form id="ad-config-form" class="ad-config-form">
@@ -204,6 +225,7 @@
                       <p id="ad-config-message" class="message" aria-live="polite"></p>
                     </form>
                     <p class="notice">A contagem é do próprio serviço e não é uma auditoria de anúncios nem garantia de monetização. Pagamentos são conferidos e processados manualmente.</p>
+                    </details>
                   </section>
                 </div>
               </div>
