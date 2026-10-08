@@ -758,6 +758,25 @@
     finally { button.disabled = false; }
   });
 
+  el("admin-payout-test-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const person = el("payout-test-person").value;
+    const amountCents = Number(el("payout-test-amount").value);
+    const personLabel = person === "mateus" ? "Mateus (final 9929)" : "Fabio (final 6164)";
+    if (!window.confirm(`Enviar à comunidade um AVISO DE TESTE para ${personLabel}, no valor ilustrativo de ${money(amountCents)}? A mensagem dirá que não houve saque nem Pix.`)) return;
+    const button = el("send-payout-test");
+    button.disabled = true;
+    say(el("payout-test-message"), "Enviando aviso identificado como teste…");
+    try {
+      const result = await api("admin-test-withdrawal-notice", { testPerson: person, amountCents });
+      say(el("payout-test-message"), result.message || "Aviso de teste enviado. Nenhum dado financeiro foi alterado.");
+    } catch (error) {
+      say(el("payout-test-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   el("export-admin-report")?.addEventListener("click", () => {
     const columns = ["periodo", "telefone_gerador", "visitas_qualificadas", "repasse_estimado_centavos", "pix_pagos_centavos", "pix_em_aberto_centavos"];
     const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;

@@ -15,6 +15,7 @@ type Payload = {
   reportGroup?: "day" | "week" | "month";
   pixKey?: string;
   amountCents?: number;
+  testPerson?: "mateus" | "fabio";
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -679,6 +680,17 @@ async function publicAdConfiguration() {
 async function adminAction(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   if (user.role !== "admin" || !adminPhones.has(user.phone)) throw new Error("Acesso restrito ao administrador.");
+  if (payload.action === "admin-test-withdrawal-notice") {
+    const person = payload.testPerson;
+    const amountCents = Number(payload.amountCents);
+    if (person !== "mateus" && person !== "fabio") throw new Error("Selecione uma conta de teste válida.");
+    if (amountCents !== 1000 && amountCents !== 7000) throw new Error("Selecione um dos valores de teste disponíveis.");
+    const personLabel = person === "mateus" ? "Mateus · conta de exemplo final 9929" : "Fabio · conta de exemplo final 6164";
+    const message = `🧪 TESTE DO URTADOR · NÃO É UM SAQUE REAL\nConta de exemplo: ${personLabel}\nValor simulado: ${formatMoney(amountCents)}\nEsta mensagem testa somente o aviso da comunidade. Nenhuma solicitação foi criada, nenhum saldo foi alterado e nenhum Pix foi enviado ou marcado como pago.`;
+    const notificationSent = await notifyCollaboratorGroup(message);
+    if (!notificationSent) throw new Error("O aviso de teste não foi enviado. Confira a integração Green API e o ID da comunidade.");
+    return { ok: true, notificationSent, message: "Aviso de teste enviado à comunidade. Nenhum dado financeiro foi alterado." };
+  }
   if (payload.action === "admin-list") {
     const [users, withdrawals, links, visits, adConfiguration] = await Promise.all([
       readAllRows("kutt_users", "id, phone, role, pix_key, payout_percent, created_at", "created_at"),

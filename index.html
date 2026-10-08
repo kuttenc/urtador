@@ -200,6 +200,18 @@
                       <p class="field-help">Fabio ou Matheus pode fazer o Pix manualmente. Use “Eu enviei o Pix” somente depois de confirmar a transferência na conta Cora. Isso registra o pagamento e avisa a comunidade; o botão não movimenta dinheiro.</p>
                       <div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
                     </details>
+                    <details class="admin-section" id="admin-payout-test-section">
+                      <summary><span>Modo teste — aviso de saque na comunidade</span><span class="admin-section-toggle">Abrir</span></summary>
+                      <p class="field-help"><strong>Simulação:</strong> envia uma mensagem identificada como TESTE para o grupo, sem solicitar saque, alterar saldo, gravar pagamento ou enviar Pix. Fabio e Matheus administradores podem usar.</p>
+                      <form id="admin-payout-test-form" class="ad-config-form">
+                        <div class="ad-code-grid admin-report-filters">
+                          <label class="field"><span>Conta de exemplo</span><select id="payout-test-person"><option value="mateus">Mateus · final 9929</option><option value="fabio">Fabio · final 6164</option></select></label>
+                          <label class="field"><span>Valor de exemplo</span><select id="payout-test-amount"><option value="1000">R$ 10,00</option><option value="7000">R$ 70,00</option></select></label>
+                        </div>
+                        <button class="button secondary" id="send-payout-test" type="submit">Enviar aviso TESTE ao grupo</button>
+                        <p id="payout-test-message" class="message" aria-live="polite"></p>
+                      </form>
+                    </details>
                     <details class="admin-section">
                       <summary><span>Valor-base interno por mil visitas</span><span class="admin-section-toggle">Abrir</span></summary>
                     <p class="field-help">Este é o valor de repasse do Urtador para visitas qualificadas; não é o CPM nem a receita real de anúncios. A mudança vale para visitas futuras. Cada registro guarda o valor vigente na data.</p>
@@ -267,6 +279,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261007-withdrawal-flow"></script>
+    <script src="assets/app.js?v=20261007-payout-test-mode"></script>
   </body>
 </html>
