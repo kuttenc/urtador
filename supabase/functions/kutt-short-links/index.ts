@@ -355,10 +355,16 @@ async function profile(request: Request, payload: Payload) {
   const { data: withdrawals, error: withdrawalError } = await supabase.from("kutt_withdrawals")
     .select("id, amount_cents, pix_key, status, requested_at, processed_at, admin_note").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(20);
   if (withdrawalError) throw withdrawalError;
+  const reportEnd = saoPauloDay();
+  const reportStart = new Date(new Date(`${reportEnd}T00:00:00Z`).getTime() - 6 * 86400000).toISOString().slice(0, 10);
+  const { data: siteAdMetrics, error: adMetricsError } = await supabase.from("kutt_ad_revenue_reports")
+    .select("report_date, impressions, clicks, ctr, cpm, currency_code")
+    .eq("provider", "adsterra").gte("report_date", reportStart).lte("report_date", reportEnd).order("report_date", { ascending: true });
+  if (adMetricsError) throw adMetricsError;
   const rewards = await readRewardBalance(user.id);
   const rewardBaseCents = await currentRewardBaseCents();
   const reservedCents = (withdrawals ?? []).filter((w) => w.status !== "rejected").reduce((sum, w) => sum + Number(w.amount_cents), 0);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [], siteAdMetrics: siteAdMetrics ?? [] };
 }
 
 async function readRewardBalance(userId: string) {
