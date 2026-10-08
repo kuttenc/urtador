@@ -12,6 +12,7 @@
     adminReportRows: [],
     adminUsers: [],
     adminLinks: [],
+    adminAdRevenueRows: [],
     adminReport: null,
     rewardBaseCents: 7000,
     user: null,
@@ -77,6 +78,47 @@
     const month = String(dateValue.getMonth() + 1).padStart(2, "0");
     const day = String(dateValue.getDate()).padStart(2, "0");
     return `${year}-${month}-${day}`;
+  }
+
+  function renderAdminAdRevenue() {
+    const rows = state.adminAdRevenueRows || [];
+    for (const provider of ["adsense", "adsterra"]) {
+      const totals = rows.filter((row) => row.provider === provider).reduce((sum, row) => ({
+        impressions: sum.impressions + Number(row.impressions || 0),
+        clicks: sum.clicks + Number(row.clicks || 0),
+        revenue: sum.revenue + Number(row.revenue_cents || 0)
+      }), { impressions: 0, clicks: 0, revenue: 0 });
+      const prefix = provider === "adsense" ? "adsense" : "adsterra";
+      el(`${prefix}-revenue-traffic`).textContent = `${totals.impressions.toLocaleString("pt-BR")} / ${totals.clicks.toLocaleString("pt-BR")}`;
+      el(`${prefix}-revenue-total`).textContent = money(totals.revenue);
+    }
+    const body = el("admin-ad-revenue-body");
+    body.replaceChildren();
+    for (const item of rows) {
+      const row = document.createElement("tr");
+      cell(row, dateOnly(item.report_date));
+      cell(row, item.provider === "adsense" ? "Google AdSense" : "Adsterra");
+      cell(row, Number(item.impressions || 0).toLocaleString("pt-BR"));
+      cell(row, Number(item.clicks || 0).toLocaleString("pt-BR"));
+      cell(row, money(item.revenue_cents));
+      cell(row, "Relatório oficial lançado no painel");
+      body.append(row);
+    }
+  }
+
+  async function loadAdminAdRevenue() {
+    const start = el("ad-revenue-start")?.value;
+    const end = el("ad-revenue-end")?.value;
+    if (!start || !end) return;
+    say(el("admin-ad-revenue-message"), "Consultando os relatórios lançados…");
+    try {
+      const report = await api("admin-ad-revenue-list", { reportStart: start, reportEnd: end });
+      state.adminAdRevenueRows = report.rows || [];
+      renderAdminAdRevenue();
+      say(el("admin-ad-revenue-message"), `${state.adminAdRevenueRows.length} registro(s) no período ${dateOnly(start)} a ${dateOnly(end)}.`);
+    } catch (error) {
+      say(el("admin-ad-revenue-message"), error.message, true);
+    }
   }
 
   function renderAdminLinks() {
@@ -449,6 +491,7 @@
     el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: Fabio ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
     say(el("ad-config-message"), savedSlots.length ? "" : "O banner Adsterra Beta do Fabio está preenchido como rascunho. Clique em Salvar anúncios para ativá-lo.");
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
+    await loadAdminAdRevenue();
   }
 
   function renderAdminReport(report) {
@@ -824,6 +867,46 @@
     finally { button.disabled = false; }
   });
 
+  el("admin-ad-revenue-filter")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await loadAdminAdRevenue();
+  });
+
+  el("admin-ad-revenue-entry")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const provider = el("ad-revenue-provider").value;
+    const reportDate = el("ad-revenue-date").value;
+    const impressions = Number(el("ad-revenue-impressions").value);
+    const clicks = Number(el("ad-revenue-clicks").value);
+    const revenue = Number(el("ad-revenue-amount").value);
+    if (!reportDate || !Number.isSafeInteger(impressions) || impressions < 0 || !Number.isSafeInteger(clicks) || clicks < 0 || !Number.isFinite(revenue) || revenue < 0) {
+      say(el("admin-ad-revenue-message"), "Confira a data, impressões, cliques e receita antes de salvar.", true);
+      return;
+    }
+    const button = el("save-ad-revenue");
+    button.disabled = true;
+    say(el("admin-ad-revenue-message"), "Salvando números informados do painel da rede…");
+    try {
+      const result = await api("admin-ad-revenue-save", {
+        provider,
+        reportStart: reportDate,
+        impressions,
+        clicks,
+        revenueCents: Math.round(revenue * 100)
+      });
+      if (reportDate < el("ad-revenue-start").value || reportDate > el("ad-revenue-end").value) {
+        el("ad-revenue-start").value = reportDate;
+        el("ad-revenue-end").value = reportDate;
+      }
+      await loadAdminAdRevenue();
+      say(el("admin-ad-revenue-message"), result.message || "Relatório salvo.");
+    } catch (error) {
+      say(el("admin-ad-revenue-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   el("admin-payout-test-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const person = el("payout-test-person").value;
@@ -908,6 +991,9 @@
   const reportDate = new Date(reportToday.getTime() - reportToday.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   if (el("report-start")) el("report-start").value = `${reportDate.slice(0, 8)}01`;
   if (el("report-end")) el("report-end").value = reportDate;
+  if (el("ad-revenue-start")) el("ad-revenue-start").value = `${reportDate.slice(0, 8)}01`;
+  if (el("ad-revenue-end")) el("ad-revenue-end").value = reportDate;
+  if (el("ad-revenue-date")) el("ad-revenue-date").value = reportDate;
   if (state.phone) el("login-phone").value = state.phone;
   if (state.token && state.passwordRecovery) {
     showAuth("set-password");

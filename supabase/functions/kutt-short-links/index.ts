@@ -16,6 +16,10 @@ type Payload = {
   pixKey?: string;
   amountCents?: number;
   testPerson?: "mateus" | "fabio";
+  provider?: "adsense" | "adsterra";
+  impressions?: number;
+  clicks?: number;
+  revenueCents?: number;
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -680,6 +684,45 @@ async function publicAdConfiguration() {
 async function adminAction(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   if (user.role !== "admin" || !adminPhones.has(user.phone)) throw new Error("Acesso restrito ao administrador.");
+  if (payload.action === "admin-ad-revenue-list") {
+    const start = validReportDay(payload.reportStart);
+    const end = validReportDay(payload.reportEnd);
+    if (start > end || (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) > 366 * 86400000) {
+      throw new Error("O período precisa estar em ordem e ter no máximo 367 dias.");
+    }
+    const { data, error } = await supabase.from("kutt_ad_revenue_reports")
+      .select("provider, report_date, impressions, clicks, revenue_cents, currency_code, updated_at")
+      .gte("report_date", start).lte("report_date", end).order("report_date", { ascending: false });
+    if (error) throw error;
+    return { ok: true, rows: data ?? [], start, end };
+  }
+  if (payload.action === "admin-ad-revenue-save") {
+    const provider = payload.provider;
+    const reportDate = validReportDay(payload.reportStart);
+    const impressions = Number(payload.impressions);
+    const clicks = Number(payload.clicks);
+    const revenueCents = Number(payload.revenueCents);
+    if (provider !== "adsense" && provider !== "adsterra") throw new Error("Selecione AdSense ou Adsterra.");
+    if (![impressions, clicks, revenueCents].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+      throw new Error("Impressões, cliques e receita devem ser números inteiros iguais ou maiores que zero.");
+    }
+    if (impressions > 1_000_000_000_000 || clicks > 1_000_000_000_000 || revenueCents > 100_000_000_000) {
+      throw new Error("Um dos valores ultrapassa o limite permitido.");
+    }
+    const { data, error } = await supabase.from("kutt_ad_revenue_reports").upsert({
+      provider,
+      report_date: reportDate,
+      impressions,
+      clicks,
+      revenue_cents: revenueCents,
+      currency_code: "BRL",
+      source: "official_dashboard",
+      updated_at: new Date().toISOString(),
+      updated_by: user.id
+    }, { onConflict: "provider,report_date" }).select("provider, report_date, impressions, clicks, revenue_cents, currency_code, updated_at").single();
+    if (error) throw error;
+    return { ok: true, row: data, message: "Dados do relatório oficial salvos. Se já existia um registro do mesmo provedor e dia, ele foi atualizado." };
+  }
   if (payload.action === "admin-test-withdrawal-notice") {
     const person = payload.testPerson;
     const amountCents = Number(payload.amountCents);
@@ -809,6 +852,8 @@ Deno.serve(async (request) => {
       case "admin-report":
       case "admin-withdrawal":
       case "admin-test-withdrawal-notice":
+      case "admin-ad-revenue-list":
+      case "admin-ad-revenue-save":
       case "admin-set-user-payout":
       case "admin-set-reward-base":
       case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));
