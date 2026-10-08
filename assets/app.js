@@ -11,6 +11,7 @@
     guestClaimedToken: "",
     adminReportRows: [],
     adminUsers: [],
+    adminLinks: [],
     adminReport: null,
     rewardBaseCents: 7000,
     user: null,
@@ -68,6 +69,78 @@
   function dateOnly(value) {
     const [year, month, day] = String(value || "").split("-").map(Number);
     return year && month && day ? new Date(year, month - 1, day).toLocaleDateString("pt-BR") : "—";
+  }
+
+  function localDateInputValue(value) {
+    const dateValue = value instanceof Date ? value : new Date(value);
+    const year = dateValue.getFullYear();
+    const month = String(dateValue.getMonth() + 1).padStart(2, "0");
+    const day = String(dateValue.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function renderAdminLinks() {
+    const linksBody = el("admin-links-body");
+    if (!linksBody) return;
+    const links = state.adminLinks || [];
+    const period = el("links-period-filter")?.value || "all";
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    let start = "";
+    let end = "";
+    if (period === "today") start = end = localDateInputValue(today);
+    if (period === "yesterday") {
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      start = end = localDateInputValue(yesterday);
+    }
+    if (period === "week") {
+      const monday = new Date(today);
+      monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
+      start = localDateInputValue(monday);
+      end = localDateInputValue(today);
+    }
+    if (period === "month") {
+      start = localDateInputValue(new Date(today.getFullYear(), today.getMonth(), 1));
+      end = localDateInputValue(today);
+    }
+    if (period === "month-pick") {
+      const monthValue = el("links-month-filter")?.value || "";
+      if (monthValue) {
+        const [year, month] = monthValue.split("-").map(Number);
+        start = `${monthValue}-01`;
+        end = localDateInputValue(new Date(year, month, 0));
+      }
+    }
+    if (period === "range") {
+      start = el("links-date-start")?.value || "";
+      end = el("links-date-end")?.value || "";
+    }
+    const digitsQuery = String(el("links-phone-filter")?.value || "").replace(/\D/g, "");
+    const filtered = links.filter((item) => {
+      const createdDay = item.created_at ? localDateInputValue(item.created_at) : "";
+      if (start && (!createdDay || createdDay < start)) return false;
+      if (end && (!createdDay || createdDay > end)) return false;
+      const user = Array.isArray(item.user) ? item.user[0] : item.user;
+      const phone = String(user?.phone || "").replace(/\D/g, "");
+      return !digitsQuery || phone.includes(digitsQuery);
+    });
+    linksBody.replaceChildren();
+    for (const item of filtered) {
+      const row = document.createElement("tr");
+      const user = Array.isArray(item.user) ? item.user[0] : item.user;
+      cell(row, user?.phone || "legado");
+      const shortCell = document.createElement("td"); shortCell.append(safeLink(`${config.defaultDomain}/${item.slug}`, item.slug)); row.append(shortCell);
+      const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
+      cell(row, Number(item.qualified_click_count || 0).toLocaleString("pt-BR"));
+      cell(row, date(item.created_at));
+      linksBody.append(row);
+    }
+    const count = el("admin-links-filter-count");
+    if (count) count.textContent = `Exibindo ${filtered.length} de ${links.length} links.`;
+    const rangeError = period === "range" && start && end && start > end;
+    const message = el("admin-links-filter-message");
+    if (message) say(message, rangeError ? "A data inicial precisa ser anterior ou igual à data final." : "");
   }
 
   function cell(row, value, tag = "td") {
@@ -264,6 +337,7 @@
     }
     const summary = data.summary || {};
     state.adminUsers = data.users || [];
+    state.adminLinks = data.links || [];
     state.rewardBaseCents = Number(data.adConfiguration?.rewardBaseCents ?? 7000);
     el("admin-user-count").textContent = Number(summary.userCount || 0).toLocaleString("pt-BR");
     el("admin-link-count").textContent = Number(summary.linkCount || 0).toLocaleString("pt-BR");
@@ -354,15 +428,7 @@
       });
       actionCell.append(saveRate); row.append(actionCell); usersBody.append(row);
     }
-    const linksBody = el("admin-links-body"); linksBody.replaceChildren();
-    for (const item of data.links || []) {
-      const row = document.createElement("tr");
-      const user = Array.isArray(item.user) ? item.user[0] : item.user;
-      cell(row, user?.phone || "legado");
-      const shortCell = document.createElement("td"); shortCell.append(safeLink(`${config.defaultDomain}/${item.slug}`, item.slug)); row.append(shortCell);
-      const targetCell = document.createElement("td"); targetCell.append(safeLink(item.target_url, item.target_url)); row.append(targetCell);
-      cell(row, Number(item.qualified_click_count || 0).toLocaleString("pt-BR")); linksBody.append(row);
-    }
+    renderAdminLinks();
     el("reward-base-value").value = (Number(adConfiguration.rewardBaseCents ?? 7000) / 100).toFixed(2);
     el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);
     el("adsense-title").value = adConfiguration.adsenseTitle || "";
@@ -788,6 +854,30 @@
   });
 
   el("report-person-filter")?.addEventListener("input", renderFilteredAdminReport);
+  const updateLinksFilterControls = () => {
+    const period = el("links-period-filter")?.value;
+    if (!period) return;
+    el("links-month-wrap").hidden = period !== "month-pick";
+    el("links-start-wrap").hidden = period !== "range";
+    el("links-end-wrap").hidden = period !== "range";
+    if (period === "month-pick" && !el("links-month-filter").value) {
+      el("links-month-filter").value = localDateInputValue(new Date()).slice(0, 7);
+    }
+    renderAdminLinks();
+  };
+  el("links-period-filter")?.addEventListener("change", updateLinksFilterControls);
+  el("links-month-filter")?.addEventListener("change", renderAdminLinks);
+  el("links-date-start")?.addEventListener("change", renderAdminLinks);
+  el("links-date-end")?.addEventListener("change", renderAdminLinks);
+  el("links-phone-filter")?.addEventListener("input", renderAdminLinks);
+  el("clear-links-filters")?.addEventListener("click", () => {
+    el("links-period-filter").value = "all";
+    el("links-month-filter").value = "";
+    el("links-date-start").value = "";
+    el("links-date-end").value = "";
+    el("links-phone-filter").value = "";
+    updateLinksFilterControls();
+  });
   el("print-admin-report")?.addEventListener("click", () => {
     const rows = renderFilteredAdminReport();
     if (!rows.length || !state.adminReport) return;
