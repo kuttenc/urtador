@@ -28,6 +28,7 @@
   let adsenseTokenClient = null;
   const adsenseOAuthStorageKey = "urtador-adsense-oauth-client-id";
   const adsenseOAuthClientId = () => String(storage.getItem(adsenseOAuthStorageKey) || config.adsenseOAuthClientId || "").trim();
+  if (el("adsense-publisher-label")) el("adsense-publisher-label").textContent = `ca-${String(config.adsensePublisherId || "").replace(/^pub-/, "")}`;
 
   function guestSessionId() {
     let id = storage.getItem("urtador-guest-session");
