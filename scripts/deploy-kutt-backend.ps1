@@ -51,6 +51,17 @@ if ($configuredGreenApiNames.Count -gt 0 -and $configuredGreenApiNames.Count -ne
 if ($configuredGreenApiNames.Count -eq $greenApiNames.Count) {
   foreach ($name in $greenApiNames) { $secretLines += "$name=$($kutt[$name])" }
 }
+$googleCredentialsPath = Join-Path $workspaceRoot 'credentials.json'
+if (Test-Path -LiteralPath $googleCredentialsPath) {
+  $googleCredentials = Get-Content -LiteralPath $googleCredentialsPath -Raw | ConvertFrom-Json
+  $googleWebClient = $googleCredentials.web
+  if (-not $googleWebClient.client_id -or -not $googleWebClient.client_secret) {
+    throw 'credentials.json existe, mas não contém client_id e client_secret de um OAuth Web.'
+  }
+  $secretLines += "ADSENSE_OAUTH_CLIENT_ID=$($googleWebClient.client_id)"
+  $secretLines += "ADSENSE_OAUTH_CLIENT_SECRET=$($googleWebClient.client_secret)"
+  $secretLines += 'ADSENSE_PUBLISHER_ID=pub-6464589391694014'
+}
 [System.IO.File]::WriteAllLines($secretFile, $secretLines, [System.Text.UTF8Encoding]::new($false))
 
 try {

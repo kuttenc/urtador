@@ -110,7 +110,7 @@
     }
   }
 
-  function requestAdSenseAccessToken() {
+  function requestAdSenseAuthorizationCode() {
     return new Promise((resolve, reject) => {
       const clientId = adsenseOAuthClientId();
       if (!clientId) {
@@ -121,63 +121,16 @@
         reject(new Error("A biblioteca de autorização do Google ainda não carregou. Recarregue a página e tente novamente."));
         return;
       }
-      adsenseTokenClient = window.google.accounts.oauth2.initTokenClient({
+      adsenseTokenClient = window.google.accounts.oauth2.initCodeClient({
         client_id: clientId,
         scope: "https://www.googleapis.com/auth/adsense.readonly",
-        callback: (response) => response?.access_token ? resolve(response.access_token) : reject(new Error(response?.error_description || response?.error || "A autorização do Google não foi concluída."))
+        ux_mode: "popup",
+        select_account: true,
+        callback: (response) => response?.code ? resolve(response.code) : reject(new Error(response?.error_description || response?.error || "A autorização do Google não foi concluída.")),
+        error_callback: (error) => reject(new Error(error?.type === "popup_closed" ? "A janela de autorização do Google foi fechada." : "Não foi possível abrir a autorização do Google."))
       });
-      adsenseTokenClient.requestAccessToken({ prompt: "consent" });
+      adsenseTokenClient.requestCode();
     });
-  }
-
-  async function googleApiJson(url, accessToken) {
-    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data?.error?.message || `A API do Google respondeu com erro ${response.status}. Confira se a AdSense Management API está ativada no projeto OAuth.`);
-    return data;
-  }
-
-  async function importAdSenseApi(accessToken, start, end) {
-    const accountsUrl = new URL("https://adsense.googleapis.com/v2/accounts");
-    accountsUrl.searchParams.set("pageSize", "100");
-    const accountData = await googleApiJson(accountsUrl, accessToken);
-    const publisherId = String(config.adsensePublisherId || "").replace(/^ca-/, "");
-    const accounts = accountData.accounts || [];
-    const account = accounts.find((item) => String(item.name || "").endsWith(publisherId)) || (accounts.length === 1 ? accounts[0] : null);
-    if (!account?.name) throw new Error(accounts.length ? "A conta autorizada não corresponde ao ID de publisher configurado. Confira a conta Google e o ID." : "Nenhuma conta AdSense foi encontrada para esta conta Google.");
-
-    const reportUrl = new URL(`https://adsense.googleapis.com/v2/${account.name}/reports:generate`);
-    reportUrl.searchParams.set("dateRange", "CUSTOM");
-    for (const [key, value] of [["startDate.year", start.slice(0, 4)], ["startDate.month", String(Number(start.slice(5, 7)))], ["startDate.day", String(Number(start.slice(8, 10)))], ["endDate.year", end.slice(0, 4)], ["endDate.month", String(Number(end.slice(5, 7)))], ["endDate.day", String(Number(end.slice(8, 10))) ]]) reportUrl.searchParams.set(key, value);
-    reportUrl.searchParams.append("dimensions", "DATE");
-    for (const metric of ["IMPRESSIONS", "CLICKS", "ESTIMATED_EARNINGS"]) reportUrl.searchParams.append("metrics", metric);
-    reportUrl.searchParams.set("currencyCode", "BRL");
-    reportUrl.searchParams.set("languageCode", "pt-BR");
-    const report = await googleApiJson(reportUrl, accessToken);
-    const headerNames = (report.headers || []).map((header) => String(header.name || "").toUpperCase());
-    const indexFor = (name) => headerNames.indexOf(name);
-    if (["DATE", "IMPRESSIONS", "CLICKS", "ESTIMATED_EARNINGS"].some((name) => indexFor(name) < 0)) {
-      throw new Error("A API do AdSense devolveu um formato de relatório diferente do esperado. Nada foi importado.");
-    }
-    const asNumber = (value) => {
-      const parsed = Number(String(value ?? "0").replace(",", "."));
-      if (!Number.isFinite(parsed) || parsed < 0) throw new Error("O relatório trouxe um valor inválido; nada foi importado.");
-      return parsed;
-    };
-    const rows = (report.rows || []).map((line) => {
-      const values = (line.cells || []).map((item) => item.value);
-      const reportDate = values[indexFor("DATE")];
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(reportDate || ""))) throw new Error("Não consegui ler as datas do relatório retornado pelo AdSense.");
-      return {
-        reportDate,
-        impressions: Math.round(asNumber(values[indexFor("IMPRESSIONS")])),
-        clicks: Math.round(asNumber(values[indexFor("CLICKS")])),
-        revenueCents: Math.round(asNumber(values[indexFor("ESTIMATED_EARNINGS")]) * 100)
-      };
-    });
-    const saved = await api("admin-ad-revenue-import-adsense-api", { rows });
-    await loadAdminAdRevenue();
-    return { ...saved, warnings: report.warnings || [], rowCount: rows.length };
   }
 
   async function loadAdminAdRevenue() {
@@ -974,11 +927,12 @@
     button.disabled = true;
     say(el("admin-ad-revenue-message"), "Aguardando autorização do Google para leitura do AdSense…");
     try {
-      const token = await requestAdSenseAccessToken();
-      say(el("admin-ad-revenue-message"), "Consultando API AdSense e salvando os dados diários…");
-      const result = await importAdSenseApi(token, start, end);
+      const authCode = await requestAdSenseAuthorizationCode();
+      say(el("admin-ad-revenue-message"), "Supabase autorizado com segurança; consultando o relatório oficial…");
+      const result = await api("admin-ad-revenue-import-adsense-api", { adsenseAuthCode: authCode, reportStart: start, reportEnd: end });
+      await loadAdminAdRevenue();
       const warning = result.warnings?.length ? ` Aviso do Google: ${result.warnings.join("; ")}` : "";
-      say(el("admin-ad-revenue-message"), `${result.message} ${result.rowCount} linha(s) recebida(s).${warning}`);
+      say(el("admin-ad-revenue-message"), `${result.message}${warning}`);
     } catch (error) {
       say(el("admin-ad-revenue-message"), error.message, true);
     } finally {

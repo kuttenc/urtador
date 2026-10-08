@@ -215,7 +215,7 @@
                         <article class="balance-card"><span>Adsterra · impressões / cliques</span><strong id="adsterra-revenue-traffic">0 / 0</strong><small id="adsterra-revenue-total">R$ 0,00</small></article>
                       </div>
                       <div class="ad-config-form">
-                        <p class="field-help">A importação usa o período acima, em BRL, e grava os valores diários recebidos do Google. O token fica somente na memória desta página e expira; não é salvo no Supabase. Informe abaixo o ID público do cliente OAuth Web criado no Google Cloud.</p>
+                        <p class="field-help">A importação usa o período acima, em BRL, e grava os valores diários recebidos do Google. A autorização entrega um código temporário ao Supabase; o segredo OAuth fica protegido nos secrets do projeto e não é publicado no site. O ID abaixo é público.</p>
                         <div class="ad-code-grid admin-report-filters">
                           <label class="field"><span>ID público OAuth Web</span><input id="adsense-oauth-client-id" type="text" autocomplete="off" placeholder="000000000000-abc.apps.googleusercontent.com"></label>
                           <button class="button secondary" id="save-adsense-oauth-client-id" type="button">Salvar configuração</button>

@@ -4,6 +4,7 @@ type Payload = {
   action?: string;
   phone?: string;
   code?: string;
+  adsenseAuthCode?: string;
   password?: string;
   token?: string;
   url?: string;
@@ -20,7 +21,6 @@ type Payload = {
   impressions?: number;
   clicks?: number;
   revenueCents?: number;
-  rows?: unknown[];
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -44,6 +44,9 @@ const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
 const greenApiUrl = (Deno.env.get("GREEN_API_URL") ?? "").replace(/\/$/, "");
 const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID") ?? "";
 const greenApiToken = Deno.env.get("GREEN_API_TOKEN") ?? "";
+const adsenseOAuthClientId = Deno.env.get("ADSENSE_OAUTH_CLIENT_ID") ?? "";
+const adsenseOAuthClientSecret = Deno.env.get("ADSENSE_OAUTH_CLIENT_SECRET") ?? "";
+const adsensePublisherId = Deno.env.get("ADSENSE_PUBLISHER_ID") ?? "pub-6464589391694014";
 const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? "").replace(/@g\.us$/i, "");
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
@@ -725,22 +728,64 @@ async function adminAction(request: Request, payload: Payload) {
     return { ok: true, row: data, message: "Dados do relatório oficial salvos. Se já existia um registro do mesmo provedor e dia, ele foi atualizado." };
   }
   if (payload.action === "admin-ad-revenue-import-adsense-api") {
-    if (!Array.isArray(payload.rows) || payload.rows.length > 400) throw new Error("A importação precisa conter até 400 dias do relatório.");
-    const rows = payload.rows.map((item) => {
-      const row = item as Record<string, unknown>;
-      const reportDate = validReportDay(row.reportDate);
-      const impressions = Number(row.impressions);
-      const clicks = Number(row.clicks);
-      const revenueCents = Number(row.revenueCents);
-      if (![impressions, clicks, revenueCents].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("A API retornou números fora do formato esperado.");
-      if (impressions > 1_000_000_000_000 || clicks > 1_000_000_000_000 || revenueCents > 100_000_000_000) throw new Error("A API retornou um valor acima do limite permitido.");
+    const authCode = String(payload.adsenseAuthCode ?? "");
+    const start = validReportDay(payload.reportStart);
+    const end = validReportDay(payload.reportEnd);
+    if (!adsenseOAuthClientId || !adsenseOAuthClientSecret) throw new Error("As credenciais OAuth do AdSense ainda não estão configuradas como secrets no Supabase.");
+    if (!authCode || authCode.length > 4096) throw new Error("O Google não retornou um código de autorização válido.");
+    if (start > end || (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) > 366 * 86400000) throw new Error("Escolha um período de até 367 dias.");
+
+    const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        code: authCode,
+        client_id: adsenseOAuthClientId,
+        client_secret: adsenseOAuthClientSecret,
+        redirect_uri: "https://kuttenc.github.io",
+        grant_type: "authorization_code"
+      })
+    });
+    const tokenData = await tokenResponse.json().catch(() => ({}));
+    if (!tokenResponse.ok || !tokenData.access_token) throw new Error(tokenData.error_description || "O Google não aceitou o código OAuth. Confira a configuração do cliente e tente conectar novamente.");
+
+    const accountsUrl = new URL("https://adsense.googleapis.com/v2/accounts");
+    accountsUrl.searchParams.set("pageSize", "100");
+    const accountsResponse = await fetch(accountsUrl, { headers: { Authorization: `Bearer ${tokenData.access_token}` } });
+    const accountsData = await accountsResponse.json().catch(() => ({}));
+    if (!accountsResponse.ok) throw new Error(accountsData?.error?.message || "Falha ao consultar as contas do AdSense. Verifique se a AdSense Management API está ativada no Google Cloud.");
+    const accountName = `accounts/${adsensePublisherId}`;
+    const account = (accountsData.accounts || []).find((item: Record<string, unknown>) => item.name === accountName);
+    if (!account) throw new Error(`A conta autorizada não contém o publisher ${adsensePublisherId}. Entre com a conta Google vinculada a esse AdSense.`);
+
+    const reportUrl = new URL(`https://adsense.googleapis.com/v2/${accountName}/reports:generate`);
+    reportUrl.searchParams.set("dateRange", "CUSTOM");
+    for (const [key, value] of [["startDate.year", start.slice(0, 4)], ["startDate.month", String(Number(start.slice(5, 7)))], ["startDate.day", String(Number(start.slice(8, 10)))], ["endDate.year", end.slice(0, 4)], ["endDate.month", String(Number(end.slice(5, 7)))], ["endDate.day", String(Number(end.slice(8, 10)))]] as const) reportUrl.searchParams.set(key, value);
+    reportUrl.searchParams.append("dimensions", "DATE");
+    for (const metric of ["IMPRESSIONS", "CLICKS", "ESTIMATED_EARNINGS"]) reportUrl.searchParams.append("metrics", metric);
+    reportUrl.searchParams.set("currencyCode", "BRL");
+    reportUrl.searchParams.set("languageCode", "pt-BR");
+    const reportResponse = await fetch(reportUrl, { headers: { Authorization: `Bearer ${tokenData.access_token}` } });
+    const report = await reportResponse.json().catch(() => ({}));
+    if (!reportResponse.ok) throw new Error(report?.error?.message || "Falha ao buscar o relatório diário da API AdSense.");
+    const headerNames = (report.headers || []).map((header: Record<string, unknown>) => String(header.name || "").toUpperCase());
+    const indexFor = (name: string) => headerNames.indexOf(name);
+    if (["DATE", "IMPRESSIONS", "CLICKS", "ESTIMATED_EARNINGS"].some((name) => indexFor(name) < 0)) throw new Error("A API AdSense retornou um formato inesperado; nada foi gravado.");
+    const rows = (report.rows || []).map((line: Record<string, any>) => {
+      const values = (line.cells || []).map((item: Record<string, unknown>) => item.value);
+      const reportDate = validReportDay(values[indexFor("DATE")]);
+      const impressions = Number(values[indexFor("IMPRESSIONS")]);
+      const clicks = Number(values[indexFor("CLICKS")]);
+      const earnings = Number(values[indexFor("ESTIMATED_EARNINGS")]);
+      const revenueCents = Math.round(earnings * 100);
+      if (![impressions, clicks, revenueCents].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("O relatório trouxe números inválidos; nada foi gravado.");
       return { provider: "adsense", report_date: reportDate, impressions, clicks, revenue_cents: revenueCents, currency_code: "BRL", source: "adsense_api", updated_at: new Date().toISOString(), updated_by: user.id };
     });
     if (rows.length) {
       const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
       if (error) throw error;
     }
-    return { ok: true, imported: rows.length, message: `${rows.length} dia(s) importado(s) diretamente da API oficial do AdSense.` };
+    return { ok: true, imported: rows.length, warnings: report.warnings || [], message: `${rows.length} dia(s) importado(s) diretamente da API oficial do AdSense.` };
   }
   if (payload.action === "admin-test-withdrawal-notice") {
     const person = payload.testPerson;
