@@ -686,7 +686,7 @@ async function adminAction(request: Request, payload: Payload) {
     if (person !== "mateus" && person !== "fabio") throw new Error("Selecione uma conta de teste válida.");
     if (amountCents !== 1000 && amountCents !== 7000) throw new Error("Selecione um dos valores de teste disponíveis.");
     const personLabel = person === "mateus" ? "Mateus · conta de exemplo final 9929" : "Fabio · conta de exemplo final 6164";
-    const message = `🧪 TESTE DO URTADOR · NÃO É UM SAQUE REAL\nConta de exemplo: ${personLabel}\nValor simulado: ${formatMoney(amountCents)}\nEsta mensagem testa somente o aviso da comunidade. Nenhuma solicitação foi criada, nenhum saldo foi alterado e nenhum Pix foi enviado ou marcado como pago.`;
+    const message = `🧪✨ *TESTE DO SISTEMA DE SAQUES* ✨🧪\n_Urtador · aviso para a comunidade_\n\n👤 *Conta de exemplo:* ${personLabel}\n💰 *Valor ilustrativo:* ${formatMoney(amountCents)}\n\n✅ Este teste verifica apenas o envio de avisos.\n🚫 Nenhum saque foi solicitado.\n💸 Nenhum Pix foi enviado ou confirmado.\n📊 Nenhum saldo foi alterado.`;
     const notificationSent = await notifyCollaboratorGroup(message);
     if (!notificationSent) throw new Error("O aviso de teste não foi enviado. Confira a integração Green API e o ID da comunidade.");
     return { ok: true, notificationSent, message: "Aviso de teste enviado à comunidade. Nenhum dado financeiro foi alterado." };
