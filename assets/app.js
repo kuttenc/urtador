@@ -19,6 +19,15 @@
     data: null,
     activeDashboardPage: ""
   };
+  const adRevenueCurrencyStorageKey = "urtador-ad-revenue-display-currency";
+  const adRevenueFxStorageKey = "urtador-usd-brl-rate";
+  const savedFx = (() => {
+    try { return JSON.parse(storage.getItem(adRevenueFxStorageKey) || "null"); } catch { return null; }
+  })();
+  state.adRevenueDisplayCurrency = storage.getItem(adRevenueCurrencyStorageKey) === "USD" ? "USD" : "BRL";
+  state.usdBrlRate = Number(savedFx?.rate) > 0 ? Number(savedFx.rate) : 0;
+  state.usdBrlUpdatedAt = savedFx?.updatedAt || "";
+  state.usdBrlFetchedAt = Number(savedFx?.fetchedAt) || 0;
   const starterAdsterraBanner = {
     title: "Adsterra Beta 300x250",
     owner: "owner",
@@ -84,8 +93,57 @@
     return `${year}-${month}-${day}`;
   }
 
+  function convertAdRevenueCents(cents, sourceCurrency, targetCurrency) {
+    const value = Number(cents) || 0;
+    if (sourceCurrency === targetCurrency) return value;
+    if (!(state.usdBrlRate > 0)) return value;
+    if (sourceCurrency === "USD" && targetCurrency === "BRL") return Math.round(value * state.usdBrlRate);
+    if (sourceCurrency === "BRL" && targetCurrency === "USD") return Math.round(value / state.usdBrlRate);
+    return value;
+  }
+
+  function renderAdRevenueFxStatus(message = "") {
+    const status = el("ad-revenue-fx-status");
+    if (!status) return;
+    if (state.usdBrlRate > 0) {
+      const updated = state.usdBrlUpdatedAt ? new Date(state.usdBrlUpdatedAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: "America/Sao_Paulo" }) : "data não informada";
+      status.textContent = `US$ 1 = ${money(Math.round(state.usdBrlRate * 100), "BRL")} · cotação publicada em ${updated}. ExchangeRate-API · atualização diária. ${message}`.trim();
+    } else {
+      status.textContent = message || "Cotação indisponível; os relatórios continuam na moeda original.";
+    }
+  }
+
+  async function loadUsdBrlRate(force = false) {
+    if (!force && state.usdBrlRate > 0 && Date.now() - state.usdBrlFetchedAt < 12 * 60 * 60 * 1000) {
+      renderAdminAdRevenue();
+      renderAdRevenueFxStatus();
+      return;
+    }
+    const button = el("refresh-ad-revenue-fx");
+    if (button) button.disabled = true;
+    renderAdRevenueFxStatus("Consultando a cotação mais recente disponível…");
+    try {
+      const response = await fetch("https://open.er-api.com/v6/latest/USD", { cache: "no-store" });
+      if (!response.ok) throw new Error(`Falha HTTP ${response.status}`);
+      const data = await response.json();
+      const rate = Number(data?.rates?.BRL);
+      if (data?.result !== "success" || !(rate > 0)) throw new Error("Resposta de câmbio inválida");
+      state.usdBrlRate = rate;
+      state.usdBrlUpdatedAt = data.time_last_update_utc || new Date().toISOString();
+      state.usdBrlFetchedAt = Date.now();
+      storage.setItem(adRevenueFxStorageKey, JSON.stringify({ rate, updatedAt: state.usdBrlUpdatedAt, fetchedAt: state.usdBrlFetchedAt }));
+      renderAdminAdRevenue();
+      renderAdRevenueFxStatus();
+    } catch {
+      renderAdRevenueFxStatus(state.usdBrlRate > 0 ? "Não foi possível atualizar agora; usando a cotação salva neste navegador." : "Não foi possível obter o câmbio. Valores exibidos na moeda original.");
+    } finally {
+      if (button) button.disabled = false;
+    }
+  }
+
   function renderAdminAdRevenue() {
     const rows = state.adminAdRevenueRows || [];
+    const targetCurrency = state.adRevenueDisplayCurrency || "BRL";
     for (const provider of ["adsense", "adsterra"]) {
       const providerRows = rows.filter((row) => row.provider === provider);
       const totals = providerRows.reduce((sum, row) => ({
@@ -94,13 +152,15 @@
       }), { impressions: 0, clicks: 0 });
       const revenueByCurrency = new Map();
       for (const row of providerRows) {
-        const currency = row.currency_code || "BRL";
-        revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + Number(row.revenue_cents || 0));
+        const originalCurrency = row.currency_code || "BRL";
+        const currency = state.usdBrlRate > 0 ? targetCurrency : originalCurrency;
+        const amount = state.usdBrlRate > 0 ? convertAdRevenueCents(row.revenue_cents, originalCurrency, targetCurrency) : Number(row.revenue_cents || 0);
+        revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + amount);
       }
       const prefix = provider === "adsense" ? "adsense" : "adsterra";
       el(`${prefix}-revenue-traffic`).textContent = `${totals.impressions.toLocaleString("pt-BR")} / ${totals.clicks.toLocaleString("pt-BR")}`;
       const currencies = [...revenueByCurrency.entries()].sort(([a], [b]) => a.localeCompare(b));
-      el(`${prefix}-revenue-total`).textContent = currencies.length ? currencies.map(([currency, cents]) => money(cents, currency)).join(" · ") : money(0, provider === "adsense" ? "BRL" : "USD");
+      el(`${prefix}-revenue-total`).textContent = currencies.length ? currencies.map(([currency, cents]) => money(cents, currency)).join(" · ") : money(0, state.usdBrlRate > 0 ? targetCurrency : provider === "adsense" ? "BRL" : "USD");
     }
     const body = el("admin-ad-revenue-body");
     body.replaceChildren();
@@ -110,7 +170,10 @@
       cell(row, item.provider === "adsense" ? "Google AdSense" : "Adsterra");
       cell(row, Number(item.impressions || 0).toLocaleString("pt-BR"));
       cell(row, Number(item.clicks || 0).toLocaleString("pt-BR"));
-      cell(row, money(item.revenue_cents, item.currency_code || "BRL"));
+      const originalCurrency = item.currency_code || "BRL";
+      const displayCurrency = state.usdBrlRate > 0 ? targetCurrency : originalCurrency;
+      const displayCents = state.usdBrlRate > 0 ? convertAdRevenueCents(item.revenue_cents, originalCurrency, targetCurrency) : Number(item.revenue_cents || 0);
+      cell(row, money(displayCents, displayCurrency));
       cell(row, item.source === "adsense_api" ? "API oficial do AdSense" : item.source === "adsterra_api" ? "API oficial Adsterra" : "Informado no painel");
       body.append(row);
     }
@@ -903,6 +966,20 @@
   el("admin-ad-revenue-filter")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     await loadAdminAdRevenue();
+  });
+
+  const adRevenueCurrencySelect = el("ad-revenue-currency");
+  if (adRevenueCurrencySelect) adRevenueCurrencySelect.value = state.adRevenueDisplayCurrency;
+  renderAdRevenueFxStatus();
+  adRevenueCurrencySelect?.addEventListener("change", () => {
+    state.adRevenueDisplayCurrency = adRevenueCurrencySelect.value === "USD" ? "USD" : "BRL";
+    storage.setItem(adRevenueCurrencyStorageKey, state.adRevenueDisplayCurrency);
+    if (!(state.usdBrlRate > 0)) loadUsdBrlRate();
+    renderAdminAdRevenue();
+  });
+  el("refresh-ad-revenue-fx")?.addEventListener("click", () => loadUsdBrlRate(true));
+  el("admin-ad-revenue-section")?.addEventListener("toggle", (event) => {
+    if (event.currentTarget.open) loadUsdBrlRate();
   });
 
   if (el("adsense-oauth-client-id")) el("adsense-oauth-client-id").value = adsenseOAuthClientId();
