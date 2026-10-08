@@ -523,6 +523,7 @@ th { color: #91a8c6; }
 }
 
 .redirect-step[hidden] { display: none !important; }
+.redirect-ad-timer { margin: 14px 0; color: #9db4cf; font-size: .95rem; text-align: center; }
 .redirect-progress { margin: 10px 0 18px; color: #87bca6; font-size: .9rem; }
 .redirect-progress strong { color: #55e9b0; }
 .redirect-promo {

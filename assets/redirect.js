@@ -5,6 +5,7 @@
   const statuses = [...document.querySelectorAll("[data-redirect-status]")];
   const reviewButton = document.querySelector("[data-redirect-review]");
   const openButton = document.querySelector("[data-redirect-open]");
+  const adTimer = document.querySelector("[data-ad-timer]");
   const steps = [...document.querySelectorAll("[data-redirect-step]")];
   const path = window.location.pathname;
   const index = path.indexOf(basePath);
@@ -16,6 +17,24 @@
 
   function showStep(number) {
     steps.forEach((step) => { step.hidden = step.dataset.redirectStep !== String(number); });
+    if (number === 2) startAdTimer();
+  }
+
+  let adTimerStarted = false;
+  function startAdTimer() {
+    if (!adTimer || adTimerStarted) return;
+    adTimerStarted = true;
+    let remaining = 9;
+    adTimer.textContent = `Anúncio: ${remaining} segundos (estimativa)`;
+    const timer = window.setInterval(() => {
+      remaining -= 1;
+      if (remaining > 0) {
+        adTimer.textContent = `Anúncio: ${remaining} ${remaining === 1 ? "segundo" : "segundos"} (estimativa)`;
+        return;
+      }
+      window.clearInterval(timer);
+      adTimer.textContent = "Estimativa de carregamento concluída. Você pode continuar quando quiser.";
+    }, 1000);
   }
 
   reviewButton?.addEventListener("click", () => showStep(2));
