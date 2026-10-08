@@ -230,7 +230,7 @@
                         <button class="button" id="import-adsense-api" type="button">Conectar Google e importar AdSense</button>
                       </div>
                       <div class="ad-config-form">
-                        <p class="field-help">A chave da API Adsterra fica somente nos secrets do Supabase. A importação usa o mesmo período acima e preserva a receita em USD, separada do AdSense e dos repasses internos.</p>
+                      <p class="field-help">A chave da API Adsterra fica somente nos secrets do Supabase. A importação traz impressões, cliques, CTR e CPM como reportados pela rede; a receita real permanece separada e em USD.</p>
                         <button class="button secondary" id="import-adsterra-api" type="button">Importar relatório da API Adsterra</button>
                       </div>
                       <form id="admin-ad-revenue-entry" class="ad-config-form">
@@ -246,7 +246,7 @@
                       </form>
                       <p class="field-help" id="admin-ad-revenue-note">AdSense pode ser importado pela API ou corrigido manualmente; Adsterra continua com lançamento manual. Salvar o mesmo provedor e dia atualiza o registro.</p>
                       <p class="message" id="admin-ad-revenue-message" aria-live="polite"></p>
-                      <div class="table-wrap"><table><thead><tr><th>Data</th><th>Rede</th><th>Impressões</th><th>Cliques reportados</th><th>Receita estimada</th><th>Origem</th></tr></thead><tbody id="admin-ad-revenue-body"></tbody></table></div>
+                      <div class="table-wrap"><table><thead><tr><th>Data</th><th>Rede</th><th>Impressões</th><th>Cliques reportados</th><th>CTR reportado</th><th>CPM reportado</th><th>Receita estimada</th><th>Origem</th></tr></thead><tbody id="admin-ad-revenue-body"></tbody></table></div>
                     </details>
                     <details class="admin-section" id="admin-payout-test-section">
                       <summary><span>Modo teste — aviso de saque na comunidade</span><span class="admin-section-toggle">Abrir</span></summary>
@@ -338,6 +338,6 @@
     </div>
     <script src="assets/config.js?v=20261008-adsense-oauth"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="assets/app.js?v=20261008-ad-revenue-currency-toggle-v2"></script>
+    <script src="assets/app.js?v=20261008-adsterra-cpm-ctr"></script>
   </body>
 </html>

@@ -170,6 +170,10 @@
       cell(row, item.provider === "adsense" ? "Google AdSense" : "Adsterra");
       cell(row, Number(item.impressions || 0).toLocaleString("pt-BR"));
       cell(row, Number(item.clicks || 0).toLocaleString("pt-BR"));
+      const ctr = item.ctr === null || item.ctr === undefined ? "—" : `${Number(item.ctr).toLocaleString("pt-BR", { maximumFractionDigits: 3 })}%`;
+      const cpm = item.cpm === null || item.cpm === undefined ? "—" : `${new Intl.NumberFormat("pt-BR", { minimumFractionDigits: 3, maximumFractionDigits: 6 }).format(Number(item.cpm))} ${item.currency_code || "USD"} / 1.000`;
+      cell(row, ctr);
+      cell(row, cpm);
       const originalCurrency = item.currency_code || "BRL";
       const displayCurrency = state.usdBrlRate > 0 ? targetCurrency : originalCurrency;
       const displayCents = state.usdBrlRate > 0 ? convertAdRevenueCents(item.revenue_cents, originalCurrency, targetCurrency) : Number(item.revenue_cents || 0);

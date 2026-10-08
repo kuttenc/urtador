@@ -696,7 +696,7 @@ async function adminAction(request: Request, payload: Payload) {
       throw new Error("O período precisa estar em ordem e ter no máximo 367 dias.");
     }
     const { data, error } = await supabase.from("kutt_ad_revenue_reports")
-      .select("provider, report_date, impressions, clicks, revenue_cents, currency_code, source, updated_at")
+      .select("provider, report_date, impressions, clicks, ctr, cpm, revenue_cents, currency_code, source, updated_at")
       .gte("report_date", start).lte("report_date", end).order("report_date", { ascending: false });
     if (error) throw error;
     return { ok: true, rows: data ?? [], start, end };
@@ -815,10 +815,12 @@ async function adminAction(request: Request, payload: Payload) {
       };
       const impressions = Math.round(numberValue(fields.impressions ?? fields.impression, "impressões"));
       const clicks = Math.round(numberValue(fields.clicks, "cliques"));
+      const ctr = numberValue(fields.ctr, "CTR");
+      const cpm = numberValue(fields.cpm, "CPM");
       const revenue = numberValue(fields.revenue, "receita");
       const revenueCents = Math.round(revenue * 100);
-      if (reportDate < start || reportDate > end || ![impressions, clicks, revenueCents].every(Number.isSafeInteger)) throw new Error("A API Adsterra retornou um dia ou valor fora do intervalo; nada foi gravado.");
-      return { provider: "adsterra", report_date: reportDate, impressions, clicks, revenue_cents: revenueCents, currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString(), updated_by: user.id };
+      if (reportDate < start || reportDate > end || ![impressions, clicks, revenueCents].every(Number.isSafeInteger) || ctr > 100) throw new Error("A API Adsterra retornou um dia ou valor fora do intervalo; nada foi gravado.");
+      return { provider: "adsterra", report_date: reportDate, impressions, clicks, ctr, cpm, revenue_cents: revenueCents, currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString(), updated_by: user.id };
     });
     if (rows.length) {
       const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
