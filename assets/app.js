@@ -474,6 +474,28 @@
     el("earnings-visits").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);
+    el("earnings-notification-fees").textContent = money(data.notificationFeesCents);
+    const notificationPreference = data.adRevenueNotifications || { enabled: false };
+    const notificationsEnabled = Boolean(notificationPreference.enabled);
+    el("ad-revenue-notification-consent").checked = false;
+    el("ad-revenue-notification-consent").hidden = notificationsEnabled;
+    el("enable-ad-revenue-notifications").hidden = notificationsEnabled;
+    el("disable-ad-revenue-notifications").hidden = !notificationsEnabled;
+    el("ad-revenue-notification-status").textContent = notificationsEnabled
+      ? `Ativo${notificationPreference.enabled_at ? ` desde ${date(notificationPreference.enabled_at)}` : ""}. Tarifa diária: R$ 0,01, cobrada após o envio do primeiro aviso do dia.`
+      : "Avisos desativados. Ative somente se aceitar a tarifa diária informada acima.";
+    const chargesBody = el("ad-notification-charges-body");
+    chargesBody.replaceChildren();
+    const notificationCharges = data.notificationCharges || [];
+    if (!notificationCharges.length) {
+      const row = document.createElement("tr"); const empty = document.createElement("td"); empty.colSpan = 2; empty.textContent = "Nenhuma tarifa registrada."; row.append(empty); chargesBody.append(row);
+    } else {
+      for (const charge of notificationCharges) {
+        const row = document.createElement("tr");
+        cell(row, dateOnly(charge.service_day)); cell(row, money(charge.amount_cents));
+        chargesBody.append(row);
+      }
+    }
     const maxWithdrawal = Math.floor(Number(data.availableCents || 0) / 1000) * 10;
     const withdrawalAmount = el("withdrawal-amount");
     if (maxWithdrawal >= 10) {
@@ -482,7 +504,7 @@
     } else {
       withdrawalAmount.removeAttribute("max");
     }
-    el("withdraw-button").disabled = Number(data.earnedCents || 0) < 7000 || maxWithdrawal < 10;
+    el("withdraw-button").disabled = Number(data.availableCents || 0) < 7000 || maxWithdrawal < 10;
     const payoutPercent = Number(data.user.payoutPercent ?? 100);
     const rewardBaseCents = Number(data.rewardBaseCents ?? 7000);
     el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(rewardBaseCents * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
@@ -957,7 +979,39 @@
     finally {
       const current = state.data || {};
       const maxAvailable = Math.floor(Number(current.availableCents || 0) / 1000) * 10;
-      button.disabled = Number(current.earnedCents || 0) < 7000 || maxAvailable < 10;
+      button.disabled = Number(current.availableCents || 0) < 7000 || maxAvailable < 10;
+    }
+  });
+
+  el("enable-ad-revenue-notifications")?.addEventListener("click", async () => {
+    if (!el("ad-revenue-notification-consent").checked) {
+      say(el("ad-revenue-notification-message"), "Marque a confirmação de leitura e aceite antes de ativar.", true);
+      return;
+    }
+    const button = el("enable-ad-revenue-notifications");
+    button.disabled = true;
+    try {
+      const result = await api("set-ad-revenue-notifications", { enabled: true, consent: true });
+      say(el("ad-revenue-notification-message"), result.message);
+      await refreshDashboard();
+    } catch (error) {
+      say(el("ad-revenue-notification-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  el("disable-ad-revenue-notifications")?.addEventListener("click", async () => {
+    const button = el("disable-ad-revenue-notifications");
+    button.disabled = true;
+    try {
+      const result = await api("set-ad-revenue-notifications", { enabled: false });
+      say(el("ad-revenue-notification-message"), result.message);
+      await refreshDashboard();
+    } catch (error) {
+      say(el("ad-revenue-notification-message"), error.message, true);
+    } finally {
+      button.disabled = false;
     }
   });
 

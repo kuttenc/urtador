@@ -22,6 +22,9 @@ type Payload = {
   clicks?: number;
   revenueCents?: number;
   announce?: boolean;
+  notifySlot?: "08" | "20";
+  enabled?: boolean;
+  consent?: boolean;
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -355,30 +358,92 @@ async function profile(request: Request, payload: Payload) {
   const { data: withdrawals, error: withdrawalError } = await supabase.from("kutt_withdrawals")
     .select("id, amount_cents, pix_key, status, requested_at, processed_at, admin_note").eq("user_id", user.id).order("requested_at", { ascending: false }).limit(20);
   if (withdrawalError) throw withdrawalError;
-  const rewards = await readRewardBalance(user.id);
+  const [rewards, notificationCharges, notificationPreference, reservedCents] = await Promise.all([
+    readRewardBalance(user.id),
+    readNotificationChargeBalance(user.id),
+    supabase.from("kutt_ad_notification_preferences")
+      .select("enabled, consent_version, enabled_at, disabled_at")
+      .eq("user_id", user.id).maybeSingle(),
+    readReservedWithdrawalCents(user.id)
+  ]);
+  if (notificationPreference.error) throw notificationPreference.error;
   const rewardBaseCents = await currentRewardBaseCents();
-  const reservedCents = (withdrawals ?? []).filter((w) => w.status !== "rejected").reduce((sum, w) => sum + Number(w.amount_cents), 0);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, earnedCents: rewards.earnedCents, reservedCents, availableCents: Math.max(0, rewards.earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  const earnedCents = rewards.earnedCents - notificationCharges.totalCents;
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationCharges: notificationCharges.rows, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
-async function personalAdRevenueReport(request: Request, payload: Payload) {
-  const { user } = await requireUser(request, payload);
-  const start = validReportDay(payload.reportStart);
-  const end = validReportDay(payload.reportEnd);
-  const daySpan = (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000;
-  if (start > end || daySpan > 366) throw new Error("Escolha um período de até 367 dias.");
+async function readReservedWithdrawalCents(userId: string) {
+  const pageSize = 1000;
+  let totalCents = 0;
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from("kutt_withdrawals")
+      .select("amount_cents, status").eq("user_id", userId)
+      .neq("status", "rejected").range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    totalCents += rows.reduce((sum, row) => sum + Number(row.amount_cents || 0), 0);
+    if (rows.length < pageSize) break;
+  }
+  return totalCents;
+}
 
-  const [{ data: shares, error: shareError }, { data: reports, error: reportError }] = await Promise.all([
-    supabase.rpc("kutt_ad_revenue_daily_visit_share", { target_user_id: user.id, start_day: start, end_day: end }),
-    supabase.from("kutt_ad_revenue_reports")
+async function readNotificationChargeBalance(userId: string) {
+  const pageSize = 1000;
+  let totalCents = 0;
+  const recentRows: Record<string, unknown>[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase.from("kutt_ad_notification_charges")
+      .select("service_day, amount_cents").eq("user_id", userId)
+      .order("service_day", { ascending: false }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = data ?? [];
+    totalCents += rows.reduce((sum, row) => sum + Number(row.amount_cents || 0), 0);
+    if (recentRows.length < 30) recentRows.push(...rows.slice(0, 30 - recentRows.length));
+    if (rows.length < pageSize) break;
+  }
+  return { totalCents, rows: recentRows };
+}
+
+async function setAdRevenueNotificationPreference(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload);
+  if (typeof payload.enabled !== "boolean") throw new Error("Escolha ativar ou desativar os avisos.");
+  const now = new Date().toISOString();
+  if (payload.enabled) {
+    if (payload.consent !== true) throw new Error("Confirme que leu e aceita a tarifa diária antes de ativar.");
+    const { error } = await supabase.from("kutt_ad_notification_preferences").upsert({
+      user_id: user.id,
+      enabled: true,
+      consent_version: "ad-revenue-whatsapp-1-cent-daily-v1",
+      consented_at: now,
+      enabled_at: now,
+      disabled_at: null,
+      updated_at: now
+    }, { onConflict: "user_id" });
+    if (error) throw error;
+    return { ok: true, enabled: true, message: "Avisos ativados. A tarifa é cobrada uma vez no dia em que pelo menos um aviso for enviado." };
+  }
+  const { error } = await supabase.from("kutt_ad_notification_preferences").upsert({
+    user_id: user.id,
+    enabled: false,
+    disabled_at: now,
+    updated_at: now
+  }, { onConflict: "user_id" });
+  if (error) throw error;
+  return { ok: true, enabled: false, message: "Avisos desativados. Não haverá novas tarifas nem mensagens." };
+}
+
+async function buildPersonalAdRevenueRows(userId: string, start: string, end: string, reportsOverride?: Record<string, unknown>[]) {
+  const [{ data: shares, error: shareError }, reportResponse] = await Promise.all([
+    supabase.rpc("kutt_ad_revenue_daily_visit_share", { target_user_id: userId, start_day: start, end_day: end }),
+    reportsOverride ? Promise.resolve({ data: reportsOverride, error: null }) : supabase.from("kutt_ad_revenue_reports")
       .select("report_date, impressions, cpm, revenue_cents, revenue_amount, currency_code")
       .eq("provider", "adsterra").gte("report_date", start).lte("report_date", end).order("report_date", { ascending: true })
   ]);
   if (shareError) throw shareError;
-  if (reportError) throw reportError;
-
+  if (reportResponse.error) throw reportResponse.error;
+  const reports = reportResponse.data ?? [];
   const shareByDay = new Map((shares ?? []).map((row: Record<string, unknown>) => [String(row.report_date).slice(0, 10), row]));
-  const rows = (reports ?? []).map((report: Record<string, unknown>) => {
+  return reports.map((report: Record<string, unknown>) => {
     const day = String(report.report_date).slice(0, 10);
     const share = shareByDay.get(day) as Record<string, unknown> | undefined;
     const userVisits = Number(share?.user_visits ?? 0);
@@ -401,6 +466,15 @@ async function personalAdRevenueReport(request: Request, payload: Payload) {
       currencyCode: String(report.currency_code ?? "USD")
     };
   });
+}
+
+async function personalAdRevenueReport(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload);
+  const start = validReportDay(payload.reportStart);
+  const end = validReportDay(payload.reportEnd);
+  const daySpan = (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) / 86400000;
+  if (start > end || daySpan > 366) throw new Error("Escolha um período de até 367 dias.");
+  const rows = await buildPersonalAdRevenueRows(user.id, start, end);
   return {
     ok: true,
     start,
@@ -719,11 +793,84 @@ async function notifyCollaboratorGroup(message: string) {
   }
 }
 
-async function sendScheduledAdsterraReport(request: Request, announce = false) {
+async function sendUserAdRevenueNotifications(rows: Record<string, unknown>[], reportStart: string, reportEnd: string, notifySlot: "08" | "20") {
+  const { data: preferences, error } = await supabase.from("kutt_ad_notification_preferences")
+    .select("user_id, user:kutt_users!kutt_ad_notification_preferences_user_id_fkey(phone)")
+    .eq("enabled", true);
+  if (error) throw error;
+  let sent = 0;
+  let failed = 0;
+  const serviceDay = saoPauloDay();
+  for (const preference of preferences ?? []) {
+    const user = Array.isArray(preference.user) ? preference.user[0] : preference.user;
+    const phone = String(user?.phone ?? "");
+    if (!phone) continue;
+    const { data: delivery, error: deliveryError } = await supabase.from("kutt_ad_notification_deliveries")
+      .insert({ user_id: preference.user_id, service_day: serviceDay, slot: notifySlot, status: "sending" })
+      .select("id").maybeSingle();
+    if (deliveryError) {
+      if (deliveryError.code === "23505") continue;
+      failed++;
+      continue;
+    }
+    if (!delivery?.id) continue;
+    try {
+      const { data: stillEnabled, error: preferenceError } = await supabase.from("kutt_ad_notification_preferences")
+        .select("enabled").eq("user_id", preference.user_id).maybeSingle();
+      if (preferenceError) throw preferenceError;
+      if (!stillEnabled?.enabled) {
+        await supabase.from("kutt_ad_notification_deliveries").update({ status: "skipped" }).eq("id", delivery.id);
+        continue;
+      }
+      const reportRows = await buildPersonalAdRevenueRows(String(preference.user_id), reportStart, reportEnd, rows);
+      const recent = reportRows.slice(-3);
+      const lines = recent.length
+        ? recent.map((item) => `📅 ${item.reportDate} · participação ${Number(item.participationPercent).toLocaleString("pt-BR", { maximumFractionDigits: 4 })}% · parcela estimada ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: item.currencyCode, minimumFractionDigits: 6, maximumFractionDigits: 10 }).format(Number(item.userRevenueEstimateUsd))}`)
+        : ["Ainda não há relatório diário da Adsterra para os últimos dias."];
+      const totalEstimate = recent.reduce((sum, item) => sum + Number(item.userRevenueEstimateUsd || 0), 0);
+      const [rewardBalance, notificationBalance, withdrawalResponse] = await Promise.all([
+        readRewardBalance(String(preference.user_id)),
+        readNotificationChargeBalance(String(preference.user_id)),
+        supabase.from("kutt_withdrawals").select("amount_cents, status").eq("user_id", preference.user_id).neq("status", "rejected")
+      ]);
+      if (withdrawalResponse.error) throw withdrawalResponse.error;
+      const alreadyChargedToday = notificationBalance.rows.some((charge) => charge.service_day === serviceDay);
+      const todayFeeCents = alreadyChargedToday ? 0 : 1;
+      const netBalanceCents = rewardBalance.earnedCents - notificationBalance.totalCents - todayFeeCents;
+      const reservedCents = (withdrawalResponse.data ?? []).reduce((sum, item) => sum + Number(item.amount_cents || 0), 0);
+      const availableCents = netBalanceCents - reservedCents;
+      const withdrawalPrompt = availableCents >= 7000
+        ? `Quer solicitar um saque? Após a tarifa de hoje, seu saldo líquido disponível é ${formatMoney(availableCents)}. Abra ${publicBaseUrl} e escolha “Saque Pix”.`
+        : `Saldo líquido disponível para saque após a tarifa de hoje: ${formatMoney(Math.max(0, availableCents))}. O mínimo é R$ 70,00; abaixo disso o painel bloqueia a solicitação. Quando atingir o mínimo, abra ${publicBaseUrl} > “Saque Pix”.`;
+      const message = `📊 *Urtador · seu resumo de anúncios (${notifySlot}h)*\n\n${lines.join("\n")}\n\n💰 *Estimativa rateada do período:* ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: recent.at(-1)?.currencyCode || "USD", minimumFractionDigits: 6, maximumFractionDigits: 10 }).format(totalEstimate)}\n\n💳 *${withdrawalPrompt}*\n\nℹ️ A rede informa valores agregados; a parcela é estimada pela participação das suas visitas qualificadas e não confirma pagamento.\n🧾 Avisos: R$ 0,01 por dia em que pelo menos um aviso for enviado, cobrado no máximo uma vez no dia (mesmo com os avisos das 8h e 20h). O saldo líquido pode ficar negativo. Você pode desativar a qualquer momento no painel.`;
+      await sendWhatsApp(phone, message);
+      const { error: chargeError } = await supabase.from("kutt_ad_notification_charges").upsert({
+        user_id: preference.user_id,
+        service_day: serviceDay,
+        amount_cents: 1,
+        delivery_id: delivery.id
+      }, { onConflict: "user_id,service_day", ignoreDuplicates: true });
+      if (chargeError) throw chargeError;
+      const { error: markSentError } = await supabase.from("kutt_ad_notification_deliveries")
+        .update({ status: "sent", sent_at: new Date().toISOString(), error_message: null }).eq("id", delivery.id);
+      if (markSentError) throw markSentError;
+      sent++;
+    } catch (notificationError) {
+      await supabase.from("kutt_ad_notification_deliveries")
+        .update({ status: "failed", error_message: String(notificationError instanceof Error ? notificationError.message : "Erro ao enviar aviso").slice(0, 500) })
+        .eq("id", delivery.id);
+      failed++;
+    }
+  }
+  return { sent, failed };
+}
+
+async function sendScheduledAdsterraReport(request: Request, announce = false, notifySlot?: "08" | "20") {
   const suppliedSecret = request.headers.get("x-kutt-report-secret") ?? "";
   if (!reportCronSecret || !secureEqual(suppliedSecret, reportCronSecret)) {
     return json(request, 401, { error: "Acesso não autorizado." });
   }
+  if (notifySlot && notifySlot !== "08" && notifySlot !== "20") throw new Error("Horário de aviso inválido.");
   if (!adsterraApiToken) throw new Error("A chave da API Adsterra não está configurada.");
   const todayParts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Sao_Paulo",
@@ -764,6 +911,9 @@ async function sendScheduledAdsterraReport(request: Request, announce = false) {
     const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
     if (error) throw error;
   }
+  const individualNotifications = notifySlot
+    ? await sendUserAdRevenueNotifications(rows, start, today, notifySlot)
+    : { sent: 0, failed: 0 };
   const activeRows = rows.filter((row) => row.impressions > 0 || row.clicks > 0);
   const dayLabel = (value: string) => {
     const weekday = new Intl.DateTimeFormat("pt-BR", { weekday: "short", timeZone: "UTC" }).format(new Date(`${value}T12:00:00Z`));
@@ -779,7 +929,7 @@ async function sendScheduledAdsterraReport(request: Request, announce = false) {
   const message = `📊 *Urtador · Relatório Adsterra — últimos 7 dias*\n${introduction}🕒 Atualizado: ${now} (Brasília)\n${lines.join("\n")}\n\nCPM é a métrica por mil impressões. A receita é o valor informado separadamente pela API e pode ser ajustada pela rede.`;
   const notificationSent = await notifyCollaboratorGroup(message);
   if (!notificationSent) throw new Error("O relatório foi consultado, mas não foi possível enviá-lo à comunidade. Confira a integração Green API do Urtador.");
-  return json(request, 200, { ok: true, imported: rows.length, notificationSent: true });
+  return json(request, 200, { ok: true, imported: rows.length, notificationSent: true, individualNotifications });
 }
 
 async function readAdConfiguration() {
@@ -1054,7 +1204,7 @@ Deno.serve(async (request) => {
   if (!supabaseUrl || !serviceRoleKey || !otpPepper) return json(request, 500, { error: "Backend sem configuração completa." });
   try {
     const payload = await request.json() as Payload;
-    if (payload.action === "scheduled-adsterra-report") return await sendScheduledAdsterraReport(request, payload.announce === true);
+    if (payload.action === "scheduled-adsterra-report") return await sendScheduledAdsterraReport(request, payload.announce === true, payload.notifySlot);
     switch (payload.action) {
       case "request-otp": return json(request, 200, await requestOtp(request, payload));
       case "request-password-recovery": return json(request, 200, await requestPasswordRecovery(request, payload));
@@ -1063,6 +1213,7 @@ Deno.serve(async (request) => {
       case "set-password": return json(request, 200, await setPassword(request, payload));
       case "me": return json(request, 200, await profile(request, payload));
       case "my-ad-revenue-report": return json(request, 200, await personalAdRevenueReport(request, payload));
+      case "set-ad-revenue-notifications": return json(request, 200, await setAdRevenueNotificationPreference(request, payload));
       case "create": return json(request, 200, await createLink(request, payload));
       case "claim-guest-links": return json(request, 200, await claimGuestLinks(request, payload));
       case "resolve": return json(request, 200, await resolveLink(request, payload));
