@@ -808,6 +808,7 @@ Deno.serve(async (request) => {
       case "admin-list":
       case "admin-report":
       case "admin-withdrawal":
+      case "admin-test-withdrawal-notice":
       case "admin-set-user-payout":
       case "admin-set-reward-base":
       case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));
