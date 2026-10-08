@@ -63,8 +63,8 @@
     return data;
   }
 
-  function money(cents) {
-    return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format((Number(cents) || 0) / 100);
+  function money(cents, currency = "BRL") {
+    return new Intl.NumberFormat("pt-BR", { style: "currency", currency }).format((Number(cents) || 0) / 100);
   }
 
   function date(value) {
@@ -87,14 +87,20 @@
   function renderAdminAdRevenue() {
     const rows = state.adminAdRevenueRows || [];
     for (const provider of ["adsense", "adsterra"]) {
-      const totals = rows.filter((row) => row.provider === provider).reduce((sum, row) => ({
+      const providerRows = rows.filter((row) => row.provider === provider);
+      const totals = providerRows.reduce((sum, row) => ({
         impressions: sum.impressions + Number(row.impressions || 0),
-        clicks: sum.clicks + Number(row.clicks || 0),
-        revenue: sum.revenue + Number(row.revenue_cents || 0)
-      }), { impressions: 0, clicks: 0, revenue: 0 });
+        clicks: sum.clicks + Number(row.clicks || 0)
+      }), { impressions: 0, clicks: 0 });
+      const revenueByCurrency = new Map();
+      for (const row of providerRows) {
+        const currency = row.currency_code || "BRL";
+        revenueByCurrency.set(currency, (revenueByCurrency.get(currency) || 0) + Number(row.revenue_cents || 0));
+      }
       const prefix = provider === "adsense" ? "adsense" : "adsterra";
       el(`${prefix}-revenue-traffic`).textContent = `${totals.impressions.toLocaleString("pt-BR")} / ${totals.clicks.toLocaleString("pt-BR")}`;
-      el(`${prefix}-revenue-total`).textContent = money(totals.revenue);
+      const currencies = [...revenueByCurrency.entries()].sort(([a], [b]) => a.localeCompare(b));
+      el(`${prefix}-revenue-total`).textContent = currencies.length ? currencies.map(([currency, cents]) => money(cents, currency)).join(" · ") : money(0, provider === "adsense" ? "BRL" : "USD");
     }
     const body = el("admin-ad-revenue-body");
     body.replaceChildren();
@@ -104,8 +110,8 @@
       cell(row, item.provider === "adsense" ? "Google AdSense" : "Adsterra");
       cell(row, Number(item.impressions || 0).toLocaleString("pt-BR"));
       cell(row, Number(item.clicks || 0).toLocaleString("pt-BR"));
-      cell(row, money(item.revenue_cents));
-      cell(row, item.source === "adsense_api" ? "API oficial do AdSense" : "Informado no painel");
+      cell(row, money(item.revenue_cents, item.currency_code || "BRL"));
+      cell(row, item.source === "adsense_api" ? "API oficial do AdSense" : item.source === "adsterra_api" ? "API oficial Adsterra" : "Informado no painel");
       body.append(row);
     }
   }
@@ -933,6 +939,31 @@
       await loadAdminAdRevenue();
       const warning = result.warnings?.length ? ` Aviso do Google: ${result.warnings.join("; ")}` : "";
       say(el("admin-ad-revenue-message"), `${result.message}${warning}`);
+    } catch (error) {
+      say(el("admin-ad-revenue-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  el("import-adsterra-api")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const start = el("ad-revenue-start")?.value;
+    const end = el("ad-revenue-end")?.value;
+    if (!start || !end || start > end) {
+      say(el("admin-ad-revenue-message"), "Escolha um período válido antes de importar.", true);
+      return;
+    }
+    if ((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000 > 366) {
+      say(el("admin-ad-revenue-message"), "O período pode ter no máximo 367 dias.", true);
+      return;
+    }
+    button.disabled = true;
+    say(el("admin-ad-revenue-message"), "Consultando a API Adsterra e salvando o relatório diário…");
+    try {
+      const result = await api("admin-ad-revenue-import-adsterra-api", { reportStart: start, reportEnd: end });
+      await loadAdminAdRevenue();
+      say(el("admin-ad-revenue-message"), result.message || "Relatório Adsterra importado.");
     } catch (error) {
       say(el("admin-ad-revenue-message"), error.message, true);
     } finally {

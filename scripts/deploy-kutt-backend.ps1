@@ -62,6 +62,13 @@ if (Test-Path -LiteralPath $googleCredentialsPath) {
   $secretLines += "ADSENSE_OAUTH_CLIENT_SECRET=$($googleWebClient.client_secret)"
   $secretLines += 'ADSENSE_PUBLISHER_ID=pub-6464589391694014'
 }
+$localEnvPath = Join-Path $workspaceRoot '.env'
+if (Test-Path -LiteralPath $localEnvPath) {
+  $localSecrets = Read-EnvFile $localEnvPath
+  if ($localSecrets['ADSTERRA_API_TOKEN']) {
+    $secretLines += "ADSTERRA_API_TOKEN=$($localSecrets['ADSTERRA_API_TOKEN'])"
+  }
+}
 [System.IO.File]::WriteAllLines($secretFile, $secretLines, [System.Text.UTF8Encoding]::new($false))
 
 try {

@@ -47,6 +47,7 @@ const greenApiToken = Deno.env.get("GREEN_API_TOKEN") ?? "";
 const adsenseOAuthClientId = Deno.env.get("ADSENSE_OAUTH_CLIENT_ID") ?? "";
 const adsenseOAuthClientSecret = Deno.env.get("ADSENSE_OAUTH_CLIENT_SECRET") ?? "";
 const adsensePublisherId = Deno.env.get("ADSENSE_PUBLISHER_ID") ?? "pub-6464589391694014";
+const adsterraApiToken = Deno.env.get("ADSTERRA_API_TOKEN") ?? "";
 const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? "").replace(/@g\.us$/i, "");
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
@@ -787,6 +788,44 @@ async function adminAction(request: Request, payload: Payload) {
     }
     return { ok: true, imported: rows.length, warnings: report.warnings || [], message: `${rows.length} dia(s) importado(s) diretamente da API oficial do AdSense.` };
   }
+  if (payload.action === "admin-ad-revenue-import-adsterra-api") {
+    const start = validReportDay(payload.reportStart);
+    const end = validReportDay(payload.reportEnd);
+    if (!adsterraApiToken) throw new Error("A chave da API Adsterra ainda não está configurada como secret no Supabase.");
+    if (start > end || (new Date(`${end}T00:00:00Z`).getTime() - new Date(`${start}T00:00:00Z`).getTime()) > 366 * 86400000) throw new Error("Escolha um período de até 367 dias.");
+    const statsUrl = new URL("https://api3.adsterratools.com/publisher/stats.json");
+    statsUrl.searchParams.set("start_date", start);
+    statsUrl.searchParams.set("finish_date", end);
+    statsUrl.searchParams.set("group_by", "date");
+    const statsResponse = await fetch(statsUrl, { headers: { Accept: "application/json", "X-API-Key": adsterraApiToken } });
+    const statsData = await statsResponse.json().catch(() => null);
+    if (!statsResponse.ok) {
+      const message = statsResponse.status === 401 ? "A Adsterra recusou a chave da API (401). Confira o token de publisher." : statsResponse.status === 403 ? "A chave Adsterra foi revogada ou expirou (403). Gere um token novo." : `A API Adsterra respondeu com erro ${statsResponse.status}.`;
+      throw new Error(message);
+    }
+    const apiRows = Array.isArray(statsData) ? statsData : (statsData?.items ?? statsData?.data ?? statsData?.stats ?? statsData?.result ?? []);
+    if (!Array.isArray(apiRows)) throw new Error("A API Adsterra devolveu um formato inesperado; nada foi gravado.");
+    const rows = apiRows.map((entry: Record<string, unknown>) => {
+      const fields = Object.fromEntries(Object.entries(entry).map(([key, value]) => [key.toLowerCase(), value]));
+      const reportDate = validReportDay(fields.date ?? fields.day);
+      const numberValue = (value: unknown, label: string) => {
+        const result = Number(String(value ?? "0").replace(",", "."));
+        if (!Number.isFinite(result) || result < 0) throw new Error(`A API Adsterra retornou ${label} inválido; nada foi gravado.`);
+        return result;
+      };
+      const impressions = Math.round(numberValue(fields.impressions ?? fields.impression, "impressões"));
+      const clicks = Math.round(numberValue(fields.clicks, "cliques"));
+      const revenue = numberValue(fields.revenue, "receita");
+      const revenueCents = Math.round(revenue * 100);
+      if (reportDate < start || reportDate > end || ![impressions, clicks, revenueCents].every(Number.isSafeInteger)) throw new Error("A API Adsterra retornou um dia ou valor fora do intervalo; nada foi gravado.");
+      return { provider: "adsterra", report_date: reportDate, impressions, clicks, revenue_cents: revenueCents, currency_code: "USD", source: "adsterra_api", updated_at: new Date().toISOString(), updated_by: user.id };
+    });
+    if (rows.length) {
+      const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
+      if (error) throw error;
+    }
+    return { ok: true, imported: rows.length, message: `${rows.length} dia(s) importado(s) diretamente da API Adsterra. Receita mantida em USD, moeda do relatório.` };
+  }
   if (payload.action === "admin-test-withdrawal-notice") {
     const person = payload.testPerson;
     const amountCents = Number(payload.amountCents);
@@ -919,6 +958,7 @@ Deno.serve(async (request) => {
       case "admin-ad-revenue-list":
       case "admin-ad-revenue-save":
       case "admin-ad-revenue-import-adsense-api":
+      case "admin-ad-revenue-import-adsterra-api":
       case "admin-set-user-payout":
       case "admin-set-reward-base":
       case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));
