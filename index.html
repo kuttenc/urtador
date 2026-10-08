@@ -168,11 +168,17 @@
                         <label class="field"><span>De</span><input id="report-start" type="date" required></label>
                         <label class="field"><span>Até</span><input id="report-end" type="date" required></label>
                         <label class="field"><span>Agrupar por</span><select id="report-group"><option value="day">Dia</option><option value="week">Semana</option><option value="month">Mês</option></select></label>
+                        <label class="field"><span>Filtrar por telefone ou Pix</span><input id="report-person-filter" type="search" placeholder="Digite telefone ou chave Pix"></label>
                       </div>
                       <button class="button" type="submit">Gerar relatório</button>
                       <button class="button secondary" id="export-admin-report" type="button" disabled>Baixar CSV</button>
+                      <button class="button secondary" id="print-admin-report" type="button" disabled>Exportar relatório PDF</button>
+                      <label class="field"><span>Gerador elegível (> R$ 70)</span><select id="report-eligible-person" disabled><option value="">Selecione uma pessoa</option></select></label>
+                      <button class="button secondary" id="print-eligible-reports" type="button" disabled>Exportar PDF individual</button>
+                      <button class="button secondary" id="test-mateus-report" type="button">Testar PDF · 995 visitas simuladas</button>
                       <p id="admin-report-message" class="message" aria-live="polite"></p>
                     </form>
+                    <p class="field-help">O teste de 995 visitas é apenas uma simulação identificada no PDF; não grava cliques, saldo ou repasse. Relatórios reais refletem os registros do sistema. Para conferência manual, valores acima de R$ 70 podem ser destacados no PDF.</p>
                     <div class="balance-grid admin-summary-grid" id="admin-report-totals" hidden>
                       <article class="balance-card"><span>Visitas qualificadas</span><strong id="report-visits">0</strong></article>
                       <article class="balance-card"><span>Repasse estimado</span><strong id="report-estimated">R$ 0,00</strong></article>
@@ -259,6 +265,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261007-adsterra-stage"></script>
+    <script src="assets/app.js?v=20261007-revenue-pdf"></script>
   </body>
 </html>

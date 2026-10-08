@@ -10,6 +10,9 @@
     resumingDraft: false,
     guestClaimedToken: "",
     adminReportRows: [],
+    adminUsers: [],
+    adminReport: null,
+    rewardBaseCents: 7000,
     user: null,
     data: null,
     activeDashboardPage: ""
@@ -251,6 +254,8 @@
       return;
     }
     const summary = data.summary || {};
+    state.adminUsers = data.users || [];
+    state.rewardBaseCents = Number(data.adConfiguration?.rewardBaseCents ?? 7000);
     el("admin-user-count").textContent = Number(summary.userCount || 0).toLocaleString("pt-BR");
     el("admin-link-count").textContent = Number(summary.linkCount || 0).toLocaleString("pt-BR");
     el("admin-qualified-visits").textContent = Number(summary.qualifiedVisits || 0).toLocaleString("pt-BR");
@@ -358,6 +363,7 @@
   }
 
   function renderAdminReport(report) {
+    state.adminReport = report;
     const totals = report.totals || {};
     el("admin-report-totals").hidden = false;
     el("report-visits").textContent = Number(totals.qualifiedVisits || 0).toLocaleString("pt-BR");
@@ -375,19 +381,80 @@
       ? "Não houve visitas qualificadas nos últimos sete dias completos; a previsão de novos repasses fica em zero até haver histórico."
       : `Base: média dos sete dias completos de ${dateOnly(forecast.referenceStart)} a ${dateOnly(forecast.referenceEnd)}.`;
     el("admin-forecast-note").textContent = `${basis} A reserva potencial soma essa projeção ao saldo de repasses estimado e ainda não marcado como pago. É uma estimativa de planejamento, não um valor de saque confirmado.`;
-    const body = el("admin-report-body"); body.replaceChildren();
     state.adminReportRows = report.rows || [];
-    for (const item of state.adminReportRows) {
+    renderFilteredAdminReport();
+  }
+
+  function renderFilteredAdminReport() {
+    const query = String(el("report-person-filter")?.value || "").trim().toLocaleLowerCase("pt-BR").replace(/\s/g, "");
+    const usersByPhone = new Map(state.adminUsers.map((user) => [String(user.phone || "").replace(/\D/g, ""), user]));
+    const rows = state.adminReportRows.filter((item) => {
+      if (!query) return true;
+      const phone = String(item.phone || "").replace(/\D/g, "");
+      const pix = String(usersByPhone.get(phone)?.pix_key || "").toLocaleLowerCase("pt-BR").replace(/\s/g, "");
+      const digitsOnlyQuery = query.replace(/\D/g, "");
+      return (digitsOnlyQuery && phone.includes(digitsOnlyQuery)) || pix.includes(query);
+    });
+    const body = el("admin-report-body"); body.replaceChildren();
+    for (const item of rows) {
       const row = document.createElement("tr");
-      cell(row, item.period);
-      cell(row, item.phone);
+      cell(row, item.period); cell(row, item.phone);
       cell(row, Number(item.qualifiedVisits || 0).toLocaleString("pt-BR"));
       cell(row, money(item.estimatedAccrualCents));
-      cell(row, money(item.paidPixCents));
-      cell(row, money(item.openPixCents));
+      cell(row, money(item.paidPixCents)); cell(row, money(item.openPixCents));
       body.append(row);
     }
-    el("export-admin-report").disabled = state.adminReportRows.length === 0;
+    const filteredTotals = rows.reduce((total, row) => ({
+      visits: total.visits + Number(row.qualifiedVisits || 0),
+      estimated: total.estimated + Number(row.estimatedAccrualCents || 0),
+      paid: total.paid + Number(row.paidPixCents || 0),
+      open: total.open + Number(row.openPixCents || 0)
+    }), { visits: 0, estimated: 0, paid: 0, open: 0 });
+    el("report-visits").textContent = filteredTotals.visits.toLocaleString("pt-BR");
+    el("report-estimated").textContent = money(filteredTotals.estimated);
+    el("report-paid").textContent = money(filteredTotals.paid);
+    el("report-open").textContent = money(filteredTotals.open);
+    el("export-admin-report").disabled = rows.length === 0;
+    el("print-admin-report").disabled = rows.length === 0;
+    const accruedByUser = new Map();
+    rows.forEach((row) => accruedByUser.set(row.phone, (accruedByUser.get(row.phone) || 0) + Number(row.estimatedAccrualCents || 0)));
+    const eligibleUsers = [...accruedByUser].filter(([, cents]) => cents > 7000);
+    const eligibleSelect = el("report-eligible-person");
+    const previousSelection = eligibleSelect.value;
+    eligibleSelect.replaceChildren(new Option("Selecione uma pessoa", ""));
+    for (const [phone, cents] of eligibleUsers) {
+      const option = new Option(`${phone} · ${money(cents)}`, phone);
+      eligibleSelect.append(option);
+    }
+    if (eligibleUsers.some(([phone]) => phone === previousSelection)) eligibleSelect.value = previousSelection;
+    eligibleSelect.disabled = eligibleUsers.length === 0;
+    el("print-eligible-reports").disabled = eligibleUsers.length === 0 || !eligibleSelect.value;
+    return rows;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>\"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" })[char]);
+  }
+
+  function printRevenuePdf(title, subtitle, reportRows, simulation = false) {
+    const grouped = new Map();
+    for (const row of reportRows) {
+      const key = simulation ? "Mateus · teste" : String(row.phone || "Conta");
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key).push(row);
+    }
+    const watermark = simulation ? '<div class="stamp">SIMULAÇÃO · NÃO PAGÁVEL · NÃO ALTERA O SALDO</div>' : "";
+    const statements = [...grouped.entries()].map(([person, rows]) => {
+      const total = rows.reduce((sum, row) => ({ visits: sum.visits + Number(row.qualifiedVisits || 0), accrued: sum.accrued + Number(row.estimatedAccrualCents || 0), paid: sum.paid + Number(row.paidPixCents || 0), open: sum.open + Number(row.openPixCents || 0) }), { visits: 0, accrued: 0, paid: 0, open: 0 });
+      const personPhone = String(rows[0]?.phone || "").replace(/\D/g, "");
+      const pixKey = state.adminUsers.find((user) => String(user.phone || "").replace(/\D/g, "") === personPhone)?.pix_key || "Não cadastrada";
+      const tableRows = rows.map((row) => `<tr><td>${escapeHtml(row.period)}</td><td>${Number(row.qualifiedVisits || 0).toLocaleString("pt-BR")}</td><td>${money(row.estimatedAccrualCents)}</td><td>${money(row.paidPixCents)}</td><td>${money(row.openPixCents)}</td></tr>`).join("");
+      return `<section class="statement"><h2>${escapeHtml(person)}</h2><p>Chave Pix cadastrada: ${escapeHtml(pixKey)}</p><div class="summary"><div>Visitas qualificadas<b>${total.visits.toLocaleString("pt-BR")}</b></div><div>Repasse estimado<b>${money(total.accrued)}</b></div><div>Pix pagos<b>${money(total.paid)}</b></div><div>Em aberto<b>${money(total.open)}</b></div></div><p><b>Faixa interna de conferência de R$ 70:</b> ${total.accrued > 7000 ? "atingida (estimativa acima de R$ 70)" : "não atingida"}.</p><table><thead><tr><th>Período</th><th>Visitas qualificadas</th><th>Estimativa</th><th>Pix pagos</th><th>Em aberto</th></tr></thead><tbody>${tableRows}</tbody></table></section>`;
+    }).join("");
+    const printWindow = window.open("", "_blank", "width=900,height=700");
+    if (!printWindow) { say(el("admin-report-message"), "O navegador bloqueou a janela do PDF. Permita pop-ups para este site e tente novamente.", true); return; }
+    printWindow.document.write(`<!doctype html><html lang="pt-BR"><meta charset="utf-8"><title>${escapeHtml(title)}</title><style>body{font:14px Arial,sans-serif;color:#15251e;margin:36px}h1{color:#08785a;margin-bottom:6px}p{line-height:1.5}.summary{display:flex;gap:12px;margin:22px 0}.summary div{border:1px solid #ccd9d1;border-radius:8px;padding:12px;flex:1}.summary b{display:block;margin-top:8px;font-size:18px}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{text-align:left;padding:9px;border-bottom:1px solid #dce5df;overflow-wrap:anywhere}th{background:#edf5f0}.stamp{border:3px solid #b42318;color:#b42318;font-weight:bold;text-align:center;padding:12px;margin:16px 0;font-size:18px}.foot{margin-top:26px;color:#52645a;font-size:12px}.statement{page-break-after:always}.statement:last-of-type{page-break-after:auto}@media print{button{display:none}}</style><body>${watermark}<h1>Urtador · Relatório de repasses</h1><p>${escapeHtml(subtitle)}</p>${statements}<p class="foot">Documento de controle interno do Urtador. “Visitas qualificadas” são aberturas de destino registradas pelo serviço. Repasse estimado não é receita real de Adsterra/AdSense nem comprovante bancário. ${simulation ? "Dados simulados para validar a exportação; não são elegíveis a pagamento." : "Conferir com o histórico de pagamentos antes de efetuar qualquer repasse."}</p><button onclick="window.print()">Imprimir / salvar como PDF</button><script>window.onload=()=>window.print()</script></body></html>`);
+    printWindow.document.close();
   }
 
   el("password-login-form")?.addEventListener("submit", async (event) => {
@@ -658,11 +725,38 @@
   el("export-admin-report")?.addEventListener("click", () => {
     const columns = ["periodo", "telefone_gerador", "visitas_qualificadas", "repasse_estimado_centavos", "pix_pagos_centavos", "pix_em_aberto_centavos"];
     const quote = (value) => `"${String(value ?? "").replace(/"/g, '""')}"`;
-    const lines = [columns, ...state.adminReportRows.map((row) => [row.period, row.phone, row.qualifiedVisits, row.estimatedAccrualCents, row.paidPixCents, row.openPixCents])];
+    const lines = [columns, ...renderFilteredAdminReport().map((row) => [row.period, row.phone, row.qualifiedVisits, row.estimatedAccrualCents, row.paidPixCents, row.openPixCents])];
     const blob = new Blob([`\uFEFF${lines.map((line) => line.map(quote).join(",")).join("\r\n")}`], { type: "text/csv;charset=utf-8" });
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a"); anchor.href = href; anchor.download = "urtador-relatorio-repasses.csv"; anchor.click();
     URL.revokeObjectURL(href);
+  });
+
+  el("report-person-filter")?.addEventListener("input", renderFilteredAdminReport);
+  el("print-admin-report")?.addEventListener("click", () => {
+    const rows = renderFilteredAdminReport();
+    if (!rows.length || !state.adminReport) return;
+    const filter = el("report-person-filter").value.trim();
+    const person = filter ? ` · Filtro: ${filter}` : " · Todos os geradores";
+    printRevenuePdf("Relatório de repasses Urtador", `Período ${dateOnly(state.adminReport.start)} a ${dateOnly(state.adminReport.end)}${person}`, rows);
+  });
+  el("print-eligible-reports")?.addEventListener("click", () => {
+    const rows = renderFilteredAdminReport();
+    const phone = el("report-eligible-person").value;
+    const eligibleRows = rows.filter((row) => row.phone === phone);
+    if (!eligibleRows.length || !state.adminReport) return;
+    printRevenuePdf("Relatório individual de repasse Urtador", `Período ${dateOnly(state.adminReport.start)} a ${dateOnly(state.adminReport.end)} · relatório individual`, eligibleRows);
+  });
+  el("report-eligible-person")?.addEventListener("change", () => {
+    el("print-eligible-reports").disabled = !el("report-eligible-person").value;
+  });
+  el("test-mateus-report")?.addEventListener("click", () => {
+    const mateus = state.adminUsers.find((user) => String(user.phone || "").replace(/\D/g, "").endsWith("9929"));
+    const percent = Number(mateus?.payout_percent ?? 50);
+    const visits = 995;
+    const cents = Math.round(visits * state.rewardBaseCents * percent / 100 / 1000);
+    const simulatedRow = { period: "SIMULAÇÃO", phone: "Mateus · teste", qualifiedVisits: visits, estimatedAccrualCents: cents, paidPixCents: 0, openPixCents: 0 };
+    printRevenuePdf("Simulação de exportação Urtador", `Teste local · 995 visitas fictícias · taxa usada no cenário: ${percent}% · base interna: ${money(state.rewardBaseCents)} por 1.000 visitas`, [simulatedRow], true);
   });
 
   const reportToday = new Date();
