@@ -20,6 +20,7 @@ type Payload = {
   impressions?: number;
   clicks?: number;
   revenueCents?: number;
+  rows?: unknown[];
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -691,7 +692,7 @@ async function adminAction(request: Request, payload: Payload) {
       throw new Error("O período precisa estar em ordem e ter no máximo 367 dias.");
     }
     const { data, error } = await supabase.from("kutt_ad_revenue_reports")
-      .select("provider, report_date, impressions, clicks, revenue_cents, currency_code, updated_at")
+      .select("provider, report_date, impressions, clicks, revenue_cents, currency_code, source, updated_at")
       .gte("report_date", start).lte("report_date", end).order("report_date", { ascending: false });
     if (error) throw error;
     return { ok: true, rows: data ?? [], start, end };
@@ -722,6 +723,24 @@ async function adminAction(request: Request, payload: Payload) {
     }, { onConflict: "provider,report_date" }).select("provider, report_date, impressions, clicks, revenue_cents, currency_code, updated_at").single();
     if (error) throw error;
     return { ok: true, row: data, message: "Dados do relatório oficial salvos. Se já existia um registro do mesmo provedor e dia, ele foi atualizado." };
+  }
+  if (payload.action === "admin-ad-revenue-import-adsense-api") {
+    if (!Array.isArray(payload.rows) || payload.rows.length > 400) throw new Error("A importação precisa conter até 400 dias do relatório.");
+    const rows = payload.rows.map((item) => {
+      const row = item as Record<string, unknown>;
+      const reportDate = validReportDay(row.reportDate);
+      const impressions = Number(row.impressions);
+      const clicks = Number(row.clicks);
+      const revenueCents = Number(row.revenueCents);
+      if (![impressions, clicks, revenueCents].every((value) => Number.isSafeInteger(value) && value >= 0)) throw new Error("A API retornou números fora do formato esperado.");
+      if (impressions > 1_000_000_000_000 || clicks > 1_000_000_000_000 || revenueCents > 100_000_000_000) throw new Error("A API retornou um valor acima do limite permitido.");
+      return { provider: "adsense", report_date: reportDate, impressions, clicks, revenue_cents: revenueCents, currency_code: "BRL", source: "adsense_api", updated_at: new Date().toISOString(), updated_by: user.id };
+    });
+    if (rows.length) {
+      const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
+      if (error) throw error;
+    }
+    return { ok: true, imported: rows.length, message: `${rows.length} dia(s) importado(s) diretamente da API oficial do AdSense.` };
   }
   if (payload.action === "admin-test-withdrawal-notice") {
     const person = payload.testPerson;
@@ -854,6 +873,7 @@ Deno.serve(async (request) => {
       case "admin-test-withdrawal-notice":
       case "admin-ad-revenue-list":
       case "admin-ad-revenue-save":
+      case "admin-ad-revenue-import-adsense-api":
       case "admin-set-user-payout":
       case "admin-set-reward-base":
       case "admin-save-ad-configuration": return json(request, 200, await adminAction(request, payload));

@@ -25,6 +25,9 @@
     script: `<script>\n  atOptions = {\n    'key' : '02033b78716daab542298321e0a8d3a6',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src="https://bauval.org/22/02033b78716daab542298321e0a8d3a6"></script>`
   };
   const el = (id) => document.getElementById(id);
+  let adsenseTokenClient = null;
+  const adsenseOAuthStorageKey = "urtador-adsense-oauth-client-id";
+  const adsenseOAuthClientId = () => String(storage.getItem(adsenseOAuthStorageKey) || config.adsenseOAuthClientId || "").trim();
 
   function guestSessionId() {
     let id = storage.getItem("urtador-guest-session");
@@ -101,16 +104,86 @@
       cell(row, Number(item.impressions || 0).toLocaleString("pt-BR"));
       cell(row, Number(item.clicks || 0).toLocaleString("pt-BR"));
       cell(row, money(item.revenue_cents));
-      cell(row, "Relatório oficial lançado no painel");
+      cell(row, item.source === "adsense_api" ? "API oficial do AdSense" : "Informado no painel");
       body.append(row);
     }
+  }
+
+  function requestAdSenseAccessToken() {
+    return new Promise((resolve, reject) => {
+      const clientId = adsenseOAuthClientId();
+      if (!clientId) {
+        reject(new Error("Informe primeiro o ID público do cliente OAuth Web criado no Google Cloud e salve a configuração."));
+        return;
+      }
+      if (!window.google?.accounts?.oauth2) {
+        reject(new Error("A biblioteca de autorização do Google ainda não carregou. Recarregue a página e tente novamente."));
+        return;
+      }
+      adsenseTokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: "https://www.googleapis.com/auth/adsense.readonly",
+        callback: (response) => response?.access_token ? resolve(response.access_token) : reject(new Error(response?.error_description || response?.error || "A autorização do Google não foi concluída."))
+      });
+      adsenseTokenClient.requestAccessToken({ prompt: "consent" });
+    });
+  }
+
+  async function googleApiJson(url, accessToken) {
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.error?.message || `A API do Google respondeu com erro ${response.status}. Confira se a AdSense Management API está ativada no projeto OAuth.`);
+    return data;
+  }
+
+  async function importAdSenseApi(accessToken, start, end) {
+    const accountsUrl = new URL("https://adsense.googleapis.com/v2/accounts");
+    accountsUrl.searchParams.set("pageSize", "100");
+    const accountData = await googleApiJson(accountsUrl, accessToken);
+    const publisherId = String(config.adsensePublisherId || "").replace(/^ca-/, "");
+    const accounts = accountData.accounts || [];
+    const account = accounts.find((item) => String(item.name || "").endsWith(publisherId)) || (accounts.length === 1 ? accounts[0] : null);
+    if (!account?.name) throw new Error(accounts.length ? "A conta autorizada não corresponde ao ID de publisher configurado. Confira a conta Google e o ID." : "Nenhuma conta AdSense foi encontrada para esta conta Google.");
+
+    const reportUrl = new URL(`https://adsense.googleapis.com/v2/${account.name}/reports:generate`);
+    reportUrl.searchParams.set("dateRange", "CUSTOM");
+    for (const [key, value] of [["startDate.year", start.slice(0, 4)], ["startDate.month", String(Number(start.slice(5, 7)))], ["startDate.day", String(Number(start.slice(8, 10)))], ["endDate.year", end.slice(0, 4)], ["endDate.month", String(Number(end.slice(5, 7)))], ["endDate.day", String(Number(end.slice(8, 10))) ]]) reportUrl.searchParams.set(key, value);
+    reportUrl.searchParams.append("dimensions", "DATE");
+    for (const metric of ["IMPRESSIONS", "CLICKS", "ESTIMATED_EARNINGS"]) reportUrl.searchParams.append("metrics", metric);
+    reportUrl.searchParams.set("currencyCode", "BRL");
+    reportUrl.searchParams.set("languageCode", "pt-BR");
+    const report = await googleApiJson(reportUrl, accessToken);
+    const headerNames = (report.headers || []).map((header) => String(header.name || "").toUpperCase());
+    const indexFor = (name) => headerNames.indexOf(name);
+    if (["DATE", "IMPRESSIONS", "CLICKS", "ESTIMATED_EARNINGS"].some((name) => indexFor(name) < 0)) {
+      throw new Error("A API do AdSense devolveu um formato de relatório diferente do esperado. Nada foi importado.");
+    }
+    const asNumber = (value) => {
+      const parsed = Number(String(value ?? "0").replace(",", "."));
+      if (!Number.isFinite(parsed) || parsed < 0) throw new Error("O relatório trouxe um valor inválido; nada foi importado.");
+      return parsed;
+    };
+    const rows = (report.rows || []).map((line) => {
+      const values = (line.cells || []).map((item) => item.value);
+      const reportDate = values[indexFor("DATE")];
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(String(reportDate || ""))) throw new Error("Não consegui ler as datas do relatório retornado pelo AdSense.");
+      return {
+        reportDate,
+        impressions: Math.round(asNumber(values[indexFor("IMPRESSIONS")])),
+        clicks: Math.round(asNumber(values[indexFor("CLICKS")])),
+        revenueCents: Math.round(asNumber(values[indexFor("ESTIMATED_EARNINGS")]) * 100)
+      };
+    });
+    const saved = await api("admin-ad-revenue-import-adsense-api", { rows });
+    await loadAdminAdRevenue();
+    return { ...saved, warnings: report.warnings || [], rowCount: rows.length };
   }
 
   async function loadAdminAdRevenue() {
     const start = el("ad-revenue-start")?.value;
     const end = el("ad-revenue-end")?.value;
     if (!start || !end) return;
-    say(el("admin-ad-revenue-message"), "Consultando os relatórios lançados…");
+    say(el("admin-ad-revenue-message"), "Consultando os relatórios salvos…");
     try {
       const report = await api("admin-ad-revenue-list", { reportStart: start, reportEnd: end });
       state.adminAdRevenueRows = report.rows || [];
@@ -870,6 +943,46 @@
   el("admin-ad-revenue-filter")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     await loadAdminAdRevenue();
+  });
+
+  if (el("adsense-oauth-client-id")) el("adsense-oauth-client-id").value = adsenseOAuthClientId();
+  el("save-adsense-oauth-client-id")?.addEventListener("click", () => {
+    const input = el("adsense-oauth-client-id");
+    const clientId = String(input.value || "").trim();
+    if (clientId && !/^[0-9]+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId)) {
+      say(el("admin-ad-revenue-message"), "Esse formato não parece um ID OAuth Web do Google (…apps.googleusercontent.com).", true);
+      return;
+    }
+    if (clientId) storage.setItem(adsenseOAuthStorageKey, clientId);
+    else storage.removeItem(adsenseOAuthStorageKey);
+    say(el("admin-ad-revenue-message"), clientId ? "ID OAuth público salvo neste navegador. Agora conecte a conta Google." : "ID OAuth removido deste navegador.");
+  });
+
+  el("import-adsense-api")?.addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const start = el("ad-revenue-start")?.value;
+    const end = el("ad-revenue-end")?.value;
+    if (!start || !end || start > end) {
+      say(el("admin-ad-revenue-message"), "Escolha um período válido antes de importar.", true);
+      return;
+    }
+    if ((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000 > 366) {
+      say(el("admin-ad-revenue-message"), "O período pode ter no máximo 367 dias.", true);
+      return;
+    }
+    button.disabled = true;
+    say(el("admin-ad-revenue-message"), "Aguardando autorização do Google para leitura do AdSense…");
+    try {
+      const token = await requestAdSenseAccessToken();
+      say(el("admin-ad-revenue-message"), "Consultando API AdSense e salvando os dados diários…");
+      const result = await importAdSenseApi(token, start, end);
+      const warning = result.warnings?.length ? ` Aviso do Google: ${result.warnings.join("; ")}` : "";
+      say(el("admin-ad-revenue-message"), `${result.message} ${result.rowCount} linha(s) recebida(s).${warning}`);
+    } catch (error) {
+      say(el("admin-ad-revenue-message"), error.message, true);
+    } finally {
+      button.disabled = false;
+    }
   });
 
   el("admin-ad-revenue-entry")?.addEventListener("submit", async (event) => {

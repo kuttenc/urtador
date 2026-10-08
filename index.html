@@ -202,7 +202,7 @@
                     </details>
                     <details class="admin-section" id="admin-ad-revenue-section">
                       <summary><span>Receita de anúncios — AdSense e Adsterra</span><span class="admin-section-toggle">Abrir</span></summary>
-                      <p class="field-help">Registre aqui os números copiados do relatório oficial de cada rede. O site não transforma carregamento do banner em impressão ou receita. Cliques e ganhos são os valores reportados pela rede e podem ser ajustados por ela. Estes dados ficam separados dos repasses aos colaboradores.</p>
+                      <p class="field-help">Conecte a conta Google para importar impressões, cliques e ganhos estimados do AdSense pela API oficial. O acesso é somente leitura e o Google pedirá sua autorização. Os números podem ser ajustados pelo Google; ficam separados dos repasses aos colaboradores.</p>
                       <form id="admin-ad-revenue-filter" class="ad-config-form">
                         <div class="ad-code-grid admin-report-filters">
                           <label class="field"><span>De</span><input id="ad-revenue-start" type="date" required></label>
@@ -213,6 +213,14 @@
                       <div class="balance-grid admin-summary-grid">
                         <article class="balance-card"><span>AdSense · impressões / cliques</span><strong id="adsense-revenue-traffic">0 / 0</strong><small id="adsense-revenue-total">R$ 0,00</small></article>
                         <article class="balance-card"><span>Adsterra · impressões / cliques</span><strong id="adsterra-revenue-traffic">0 / 0</strong><small id="adsterra-revenue-total">R$ 0,00</small></article>
+                      </div>
+                      <div class="ad-config-form">
+                        <p class="field-help">A importação usa o período acima, em BRL, e grava os valores diários recebidos do Google. O token fica somente na memória desta página e expira; não é salvo no Supabase. Informe abaixo o ID público do cliente OAuth Web criado no Google Cloud.</p>
+                        <div class="ad-code-grid admin-report-filters">
+                          <label class="field"><span>ID público OAuth Web</span><input id="adsense-oauth-client-id" type="text" autocomplete="off" placeholder="000000000000-abc.apps.googleusercontent.com"></label>
+                          <button class="button secondary" id="save-adsense-oauth-client-id" type="button">Salvar configuração</button>
+                        </div>
+                        <button class="button" id="import-adsense-api" type="button">Conectar Google e importar AdSense</button>
                       </div>
                       <form id="admin-ad-revenue-entry" class="ad-config-form">
                         <h4>Adicionar ou corrigir um dia do relatório oficial</h4>
@@ -225,7 +233,7 @@
                         </div>
                         <button class="button" id="save-ad-revenue" type="submit">Salvar dados do relatório</button>
                       </form>
-                      <p class="field-help" id="admin-ad-revenue-note">Os dados são lançados manualmente a partir das contas AdSense e Adsterra. Salvar o mesmo provedor e data substitui o lançamento daquele dia.</p>
+                      <p class="field-help" id="admin-ad-revenue-note">AdSense pode ser importado pela API ou corrigido manualmente; Adsterra continua com lançamento manual. Salvar o mesmo provedor e dia atualiza o registro.</p>
                       <p class="message" id="admin-ad-revenue-message" aria-live="polite"></p>
                       <div class="table-wrap"><table><thead><tr><th>Data</th><th>Rede</th><th>Impressões</th><th>Cliques reportados</th><th>Receita estimada</th><th>Origem</th></tr></thead><tbody id="admin-ad-revenue-body"></tbody></table></div>
                     </details>
@@ -318,6 +326,7 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261008-ad-revenue-reports"></script>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="assets/app.js?v=20261008-adsense-api"></script>
   </body>
 </html>
