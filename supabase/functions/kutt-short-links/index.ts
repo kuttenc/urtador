@@ -14,6 +14,7 @@ type Payload = {
   reportEnd?: string;
   reportGroup?: "day" | "week" | "month";
   pixKey?: string;
+  amountCents?: number;
   withdrawalId?: string;
   userId?: string;
   payoutPercent?: number;
@@ -41,6 +42,10 @@ const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? 
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+
+function formatMoney(cents: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
+}
 
 function normalizePhone(input: string) {
   let digits = String(input).replace(/\D/g, "");
@@ -460,17 +465,17 @@ async function logout(request: Request, payload: Payload) {
 
 async function requestWithdrawal(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
-  if (!user.pix_key) throw new Error("Cadastre sua chave Pix antes de solicitar saque.");
-  const { earnedCents: earned } = await readRewardBalance(user.id);
-  const { data: withdrawals, error: withdrawalError } = await supabase.from("kutt_withdrawals").select("amount_cents, status")
-    .eq("user_id", user.id).neq("status", "rejected");
-  if (withdrawalError) throw withdrawalError;
-  const reserved = (withdrawals ?? []).reduce((sum, item) => sum + Number(item.amount_cents), 0);
-  const amount = earned - reserved;
-  if (amount < 7000) throw new Error("Seu saldo ainda não atingiu R$ 70,00 disponíveis para saque.");
-  const { error } = await supabase.from("kutt_withdrawals").insert({ user_id: user.id, amount_cents: amount, pix_key: user.pix_key });
+  const amount = Math.round(Number(payload.amountCents));
+  if (!Number.isSafeInteger(amount) || amount < 1000 || amount % 1000 !== 0) {
+    throw new Error("Informe um valor a partir de R$ 10,00, em múltiplos de R$ 10,00.");
+  }
+  const { data, error } = await supabase.rpc("kutt_request_withdrawal", { p_user_id: user.id, p_amount_cents: amount });
   if (error) throw error;
-  return { ok: true, amountCents: amount, message: "Solicitação enviada. O administrador fará o pagamento via Pix após conferir as visitas." };
+  const withdrawal = Array.isArray(data) ? data[0] : data;
+  if (!withdrawal?.id) throw new Error("A solicitação não retornou confirmação. Atualize o painel antes de tentar novamente.");
+  const lastDigits = String(user.phone ?? "").replace(/\D/g, "").slice(-4) || "????";
+  const notificationSent = await notifyCollaboratorGroup(`📥 Solicitação de saque recebida no Urtador\nConta final ${lastDigits} · ${formatMoney(Number(withdrawal.amount_cents))}\nStatus: aguardando conferência e pagamento manual.`);
+  return { ok: true, amountCents: Number(withdrawal.amount_cents), notificationSent, message: `Solicitação de ${formatMoney(Number(withdrawal.amount_cents))} registrada. O administrador confere as visitas e faz o Pix manualmente.` };
 }
 
 async function readAllRows(table: string, columns: string, orderBy: string) {
@@ -747,15 +752,23 @@ async function adminAction(request: Request, payload: Payload) {
   if (payload.action === "admin-withdrawal") {
     const status = payload.status;
     if (!payload.withdrawalId || !["approved", "paid", "rejected"].includes(status ?? "")) throw new Error("Ação de saque inválida.");
-    const { data: current, error: readError } = await supabase.from("kutt_withdrawals").select("status").eq("id", payload.withdrawalId).maybeSingle();
+    const { data: current, error: readError } = await supabase.from("kutt_withdrawals")
+      .select("id, status, amount_cents, pix_key, user:kutt_users!kutt_withdrawals_user_id_fkey(phone)")
+      .eq("id", payload.withdrawalId).maybeSingle();
     if (readError) throw readError;
     if (!current) throw new Error("Solicitação não encontrada.");
-    const transitions: Record<string, string[]> = { pending: ["approved", "rejected"], approved: ["paid", "rejected"] };
+    const transitions: Record<string, string[]> = { pending: ["approved", "paid", "rejected"], approved: ["paid", "rejected"] };
     if (!transitions[current.status]?.includes(status!)) throw new Error("Transição de status inválida para esta solicitação.");
     const { data: updated, error } = await supabase.from("kutt_withdrawals").update({ status, admin_note: String(payload.note ?? "").slice(0, 500), processed_at: new Date().toISOString(), processed_by: user.id }).eq("id", payload.withdrawalId).eq("status", current.status).select("id").maybeSingle();
     if (error) throw error;
     if (!updated) throw new Error("A solicitação mudou em outra sessão. Atualize o painel.");
-    return { ok: true, message: status === "paid" ? "Pagamento marcado como realizado." : "Solicitação atualizada." };
+    let notificationSent = false;
+    if (status === "paid") {
+      const user = Array.isArray(current.user) ? current.user[0] : current.user;
+      const lastDigits = String(user?.phone ?? "").replace(/\D/g, "").slice(-4) || "????";
+      notificationSent = await notifyCollaboratorGroup(`✅ Repasse Pix confirmado no Urtador\nConta final ${lastDigits} · ${formatMoney(Number(current.amount_cents))}\nPagamento conferido e marcado manualmente por administrador.`);
+    }
+    return { ok: true, notificationSent, message: status === "paid" ? "Pagamento marcado como realizado." : "Solicitação atualizada." };
   }
   throw new Error("Ação administrativa inválida.");
 }

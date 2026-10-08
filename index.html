@@ -125,8 +125,9 @@
 
                   <section class="workspace-page" data-dashboard-area="payouts" hidden>
                     <div class="workspace-two-column">
-                      <section class="panel"><h3>Solicitar saque via Pix</h3><p class="field-help">Cadastre sua chave. Quando houver saldo disponível, envie a solicitação; o administrador confere e faz o pagamento manualmente.</p>
+                      <section class="panel"><h3>Solicitar saque via Pix</h3><p class="field-help">Ao acumular R$ 70,00 em visitas qualificadas reais, você libera saques. Cada pedido deve ser de no mínimo R$ 10,00, em múltiplos de R$ 10,00, com até 3 solicitações por dia. Um administrador confere e faz o Pix manualmente pela Cora; pedidos pendentes são avisados no grupo pelo final do telefone e valor.</p>
                         <form id="pix-form"><div class="field"><label for="pix-key">Sua chave Pix</label><input id="pix-key" name="pixKey" maxlength="120" autocomplete="off" placeholder="CPF, celular, e-mail ou chave aleatória" required></div><button class="button secondary" type="submit">Salvar chave Pix</button></form>
+                        <div class="field"><label for="withdrawal-amount">Valor do saque (R$)</label><input id="withdrawal-amount" type="number" min="10" step="10" value="10" inputmode="numeric"></div>
                         <button class="button" type="button" id="withdraw-button">Solicitar saque</button><p class="message" id="payout-message" aria-live="polite"></p>
                       </section>
                       <section class="panel"><h3>Histórico de saques</h3><div class="table-wrap"><table><thead><tr><th>Solicitado</th><th>Valor</th><th>Status</th></tr></thead><tbody id="withdrawals-body"></tbody></table></div></section>
@@ -194,8 +195,9 @@
                     </div>
                     <div class="table-wrap"><table><thead><tr><th>Período</th><th>Gerador</th><th>Visitas qualificadas</th><th>Repasse estimado</th><th>Pix pagos</th><th>Pix em aberto</th></tr></thead><tbody id="admin-report-body"></tbody></table></div>
                     </details>
-                    <details class="admin-section">
-                      <summary><span>Solicitações Pix</span><span class="admin-section-toggle">Abrir</span></summary>
+                    <details class="admin-section" id="admin-withdrawals-section">
+                      <summary><span>Solicitações Pix — telefone, chave e valor</span><span class="admin-section-toggle">Abrir</span></summary>
+                      <p class="field-help">Fabio ou Matheus pode fazer o Pix manualmente. Use “Eu enviei o Pix” somente depois de confirmar a transferência na conta Cora. Isso registra o pagamento e avisa a comunidade; o botão não movimenta dinheiro.</p>
                       <div class="table-wrap"><table><thead><tr><th>Telefone</th><th>Chave Pix</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead><tbody id="admin-withdrawals-body"></tbody></table></div>
                     </details>
                     <details class="admin-section">
@@ -265,6 +267,6 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261005-session-draft"></script>
-    <script src="assets/app.js?v=20261007-revenue-pdf"></script>
+    <script src="assets/app.js?v=20261007-withdrawal-flow"></script>
   </body>
 </html>

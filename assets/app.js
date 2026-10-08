@@ -199,6 +199,15 @@
     el("earnings-visits").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);
+    const maxWithdrawal = Math.floor(Number(data.availableCents || 0) / 1000) * 10;
+    const withdrawalAmount = el("withdrawal-amount");
+    if (maxWithdrawal >= 10) {
+      withdrawalAmount.max = String(maxWithdrawal);
+      if (Number(withdrawalAmount.value) > maxWithdrawal) withdrawalAmount.value = String(maxWithdrawal);
+    } else {
+      withdrawalAmount.removeAttribute("max");
+    }
+    el("withdraw-button").disabled = Number(data.earnedCents || 0) < 7000 || maxWithdrawal < 10;
     const payoutPercent = Number(data.user.payoutPercent ?? 100);
     const rewardBaseCents = Number(data.rewardBaseCents ?? 7000);
     el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(rewardBaseCents * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
@@ -271,19 +280,33 @@
       dailyBody.append(row);
     }
     const withdrawalsBody = el("admin-withdrawals-body"); withdrawalsBody.replaceChildren();
+    const pendingWithdrawalCount = (data.withdrawals || []).filter((item) => item.status === "pending" || item.status === "approved").length;
+    el("admin-withdrawals-section").open = pendingWithdrawalCount > 0;
     for (const item of data.withdrawals || []) {
       const row = document.createElement("tr");
       const user = Array.isArray(item.user) ? item.user[0] : item.user;
-      cell(row, user?.phone || "—"); cell(row, item.pix_key); cell(row, money(item.amount_cents)); cell(row, item.status);
+      cell(row, user?.phone || "—");
+      const pixCell = cell(row, item.pix_key);
+      if (item.pix_key) {
+        const copyPix = document.createElement("button"); copyPix.className = "button small secondary"; copyPix.type = "button"; copyPix.textContent = "Copiar chave";
+        copyPix.addEventListener("click", async () => {
+          try { await navigator.clipboard.writeText(item.pix_key); say(el("admin-load-message"), `Chave Pix do telefone final ${String(user?.phone || "").slice(-4)} copiada.`); }
+          catch { say(el("admin-load-message"), "Não foi possível copiar a chave Pix neste navegador.", true); }
+        });
+        pixCell.append(document.createTextNode(" "), copyPix);
+      }
+      cell(row, money(item.amount_cents)); cell(row, item.status === "pending" ? "Solicitado · aguardando pagamento" : item.status === "approved" ? "Aprovado · aguardando Pix" : item.status === "paid" ? "Pago" : "Recusado");
       const actions = document.createElement("td");
       if (item.status === "pending" || item.status === "approved") {
         const action = document.createElement("button"); action.className = "button small"; action.type = "button";
-        action.textContent = item.status === "pending" ? "Aprovar" : "Marcar pago";
+        action.textContent = "Eu enviei o Pix";
         action.addEventListener("click", async () => {
-          const nextStatus = item.status === "pending" ? "approved" : "paid";
-          const prompt = nextStatus === "paid" ? `Confirma que fez o Pix de ${money(item.amount_cents)} para ${item.pix_key}?` : `Aprovar o saque de ${money(item.amount_cents)} para ${item.pix_key}?`;
-          if (!window.confirm(prompt)) return;
-          await api("admin-withdrawal", { withdrawalId: item.id, status: nextStatus }); await refreshDashboard();
+          if (!window.confirm(`Confirma que o Pix de ${money(item.amount_cents)} foi realmente enviado para a chave ${item.pix_key}? Isso marcará o pedido como pago e avisará a comunidade.`)) return;
+          try {
+            const result = await api("admin-withdrawal", { withdrawalId: item.id, status: "paid" });
+            await refreshDashboard();
+            say(el("admin-load-message"), result.notificationSent ? "Pix registrado como pago. Aviso enviado à comunidade." : "Pix registrado como pago, mas o aviso à comunidade não foi enviado.", !result.notificationSent);
+          } catch (error) { say(el("admin-load-message"), error.message, true); }
         });
         const reject = document.createElement("button"); reject.className = "button small secondary"; reject.type = "button"; reject.textContent = "Recusar";
         reject.addEventListener("click", async () => { await api("admin-withdrawal", { withdrawalId: item.id, status: "rejected", note: "Recusado pelo administrador" }); await refreshDashboard(); });
@@ -628,8 +651,21 @@
   });
 
   el("withdraw-button")?.addEventListener("click", async () => {
-    try { const result = await api("withdraw"); say(el("payout-message"), result.message); await refreshDashboard(); }
-    catch (error) { say(el("payout-message"), error.message, true); }
+    const amount = Number(el("withdrawal-amount").value);
+    if (!Number.isSafeInteger(amount) || amount < 10 || amount % 10 !== 0) {
+      say(el("payout-message"), "Escolha pelo menos R$ 10,00, em múltiplos de R$ 10,00.", true); return;
+    }
+    const button = el("withdraw-button"); button.disabled = true;
+    try {
+      const result = await api("withdraw", { amountCents: amount * 100 });
+      say(el("payout-message"), `${result.message}${result.notificationSent ? " Aviso enviado à comunidade." : " O pedido ficou registrado; o aviso à comunidade não foi enviado."}`, !result.notificationSent);
+      await refreshDashboard();
+    } catch (error) { say(el("payout-message"), error.message, true); }
+    finally {
+      const current = state.data || {};
+      const maxAvailable = Math.floor(Number(current.availableCents || 0) / 1000) * 10;
+      button.disabled = Number(current.earnedCents || 0) < 7000 || maxAvailable < 10;
+    }
   });
 
   el("refresh-admin")?.addEventListener("click", () => refreshAdmin().catch((error) => window.alert(error.message)));
