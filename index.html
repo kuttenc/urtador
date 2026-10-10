@@ -56,7 +56,7 @@
                 <button class="button secondary" type="button" id="recovery-back">Voltar ao login</button>
               </form>
               <form id="otp-form" hidden>
-                <p class="field-help">Digite o código publicado no grupo Kuttencurtador ao lado do DDD e dos quatro últimos dígitos do telefone.</p>
+                <p class="field-help">Digite o código de seis dígitos que você recebeu no WhatsApp.</p>
                 <div class="field"><label for="otp">Código de 6 dígitos</label><input id="otp" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></div>
                 <button class="button" type="submit">Confirmar código</button>
                 <button class="button secondary" type="button" id="change-phone">Voltar</button>
@@ -67,6 +67,7 @@
                 <div class="field"><label for="confirm-password">Confirme a senha</label><input id="confirm-password" name="password-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
                 <button class="button" type="submit">Salvar senha</button>
               </form>
+              <button class="button secondary" type="button" id="existing-otp-button">Já recebi um código</button>
               <p class="message" id="auth-message" aria-live="polite"></p>
               <form id="prelogin-link-form" class="prelogin-link-form">
                 <h3>Encurte sem cadastro</h3>
@@ -350,6 +351,6 @@
     <script src="assets/config.js?v=20261008-adsense-oauth"></script>
     <script src="assets/country-dial-codes.js?v=20261009-ddi-fixed"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="assets/app.js?v=20261009-ddi-inline"></script>
+    <script src="assets/app.js?v=20261009-enter-code"></script>
   </body>
 </html>

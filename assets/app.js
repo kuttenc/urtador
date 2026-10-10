@@ -448,7 +448,18 @@
     el("password-recovery-form").hidden = mode !== "recovery";
     el("otp-form").hidden = mode !== "otp";
     el("set-password-form").hidden = mode !== "set-password";
+    el("existing-otp-button").hidden = mode !== "password" && mode !== "recovery";
   }
+
+  el("existing-otp-button").addEventListener("click", () => {
+    const prefix = el("password-recovery-form").hidden ? "login" : "recovery";
+    if (!el(`${prefix}-phone`).reportValidity()) return;
+    state.phone = phoneForRequest(`${prefix}-phone`, `${prefix}-dial-code`);
+    storage.setItem("urtador-phone", state.phone);
+    showAuth("otp");
+    say(el("auth-message"), "Digite o código que você recebeu para esse telefone.");
+    el("otp").focus();
+  });
 
   function friendlyAuthError(error) {
     const message = String(error?.message || "Não foi possível concluir o acesso.");
