@@ -329,8 +329,8 @@ async function createSession(user: { id: string; phone: string; role: string; pi
 }
 
 async function loginWithPassword(request: Request, payload: Payload) {
-  await rateLimit(request, "password-login-ip", 12, 60);
   const phone = normalizePhone(payload.phone ?? "");
+  await rateLimit(request, adminPhones.has(phone) ? "password-login-admin-ip" : "password-login-ip", 12, 60);
   await rateLimitIdentity("password-login-phone", phone, 8, 15);
   const password = validatePassword(payload.password);
   const { data: user, error } = await supabase.from("kutt_users")
