@@ -49,6 +49,7 @@ const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
 const greenApiUrl = (Deno.env.get("GREEN_API_FALLBACK_URL") || Deno.env.get("GREEN_API_URL") || "").replace(/\/$/, "");
 const greenApiInstance = Deno.env.get("GREEN_API_FALLBACK_INSTANCE_ID") || Deno.env.get("GREEN_API_INSTANCE_ID") || "";
 const greenApiToken = Deno.env.get("GREEN_API_FALLBACK_TOKEN") || Deno.env.get("GREEN_API_TOKEN") || "";
+const groupMessagingEnabled = (Deno.env.get("KUTT_GROUP_MESSAGING_ENABLED") ?? "true").toLowerCase() === "true";
 const kuttCommunityId = "120363430513969812@g.us";
 const adsenseOAuthClientId = Deno.env.get("ADSENSE_OAUTH_CLIENT_ID") ?? "";
 const adsenseOAuthClientSecret = Deno.env.get("ADSENSE_OAUTH_CLIENT_SECRET") ?? "";
@@ -264,6 +265,7 @@ async function ensureKuttCommunityMember(phone: string) {
 }
 
 async function sendOtpToKuttCommunity(phone: string, code: string) {
+  if (!groupMessagingEnabled) throw new Error("O envio de códigos está temporariamente pausado. Tente novamente mais tarde.");
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
   const digits = phone.slice(2);
   const phoneEnding = `(${digits.slice(0, 2)}) ****-${digits.slice(-4)}`;
@@ -1045,6 +1047,7 @@ function makeAdminSummary(users: Record<string, any>[], withdrawals: Record<stri
 }
 
 async function notifyCollaboratorGroup(message: string) {
+  if (!groupMessagingEnabled) return false;
   if (!adNotificationGroupId || !greenApiUrl || !greenApiInstance || !greenApiToken) return false;
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
   try {
