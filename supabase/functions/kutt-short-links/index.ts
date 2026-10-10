@@ -446,6 +446,7 @@ async function verifyOtp(request: Request, payload: Payload) {
     user = updated.data; userError = updated.error;
   }
   if (userError) throw userError;
+  if (!user) throw new Error("Não foi possível concluir a verificação da conta.");
   return { ...await createSession(user, Boolean(challenge.password_recovery)), passwordSetupRequired: !knownUser?.password_hash, passwordRecoveryRequired: Boolean(challenge.password_recovery) };
 }
 
