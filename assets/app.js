@@ -1060,13 +1060,20 @@
     }
     say(el("auth-message"), "Salvando sua senha…");
     try {
+      const recoveringPassword = state.passwordRecovery;
       const result = await api("set-password", { password });
       state.passwordSetupRequired = false;
       state.passwordRecovery = false;
       storage.removeItem("urtador-password-setup");
       storage.removeItem("urtador-password-recovery");
       await refreshDashboard();
-      say(el("auth-message"), result.message);
+      if (recoveringPassword) {
+        showDashboardPage("settings");
+        say(el("linked-account-message"), "Senha da Conta 1 recuperada. Agora você pode criar a Conta 2 ou 3 nesta tela.");
+        say(el("auth-message"), "Senha recuperada. Abra Configurações para criar uma conta vinculada.");
+      } else {
+        say(el("auth-message"), result.message);
+      }
     } catch (error) { say(el("auth-message"), friendlyAuthError(error), true); }
   });
 
