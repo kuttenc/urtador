@@ -224,7 +224,7 @@ async function rateLimit(request: Request, action: string, limit: number, minute
 }
 
 async function sendWhatsApp(phone: string, message: string) {
-  if (!greenApiUrl || !greenApiInstance || !greenApiToken) throw new Error("O envio de código ainda não está configurado no servidor.");
+  if (!greenApiUrl || !greenApiInstance || !greenApiToken) throw new Error("O envio do código está temporariamente indisponível. Tente novamente mais tarde.");
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
   const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: `${phone}@c.us`, message }) });
   const result = await response.json().catch(() => ({}));
@@ -233,7 +233,7 @@ async function sendWhatsApp(phone: string, message: string) {
 
 async function ensureKuttCommunityMember(phone: string) {
   if (!greenApiUrl || !greenApiInstance || !greenApiToken) {
-    throw new Error("O envio pelo grupo ainda não está configurado no servidor.");
+    throw new Error("Não foi possível confirmar a comunidade agora. Tente novamente mais tarde.");
   }
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/getGroupData/${encodeURIComponent(greenApiToken)}`;
   let response: Response;
@@ -247,7 +247,7 @@ async function ensureKuttCommunityMember(phone: string) {
     throw new Error("Não consegui confirmar os membros da comunidade Kuttencurtador. Tente novamente mais tarde.");
   }
   if (!response.ok) {
-    throw new Error("A conexão do WhatsApp da comunidade está indisponível. A equipe precisa reativá-la.");
+    throw new Error("A comunidade está temporariamente indisponível. Tente novamente mais tarde.");
   }
   const group = await response.json().catch(() => ({}));
   if (String(group?.subject ?? "").trim().toLocaleLowerCase("pt-BR") !== "kuttencurtador" || !Array.isArray(group?.participants)) {
@@ -286,12 +286,12 @@ async function sendOtpToKuttCommunity(phone: string, code: string) {
       chatsTotal: receipt?.correspondentsStatus?.total ?? null
     }));
     if (response.status === 466) {
-      throw new Error("O código não foi enviado: a Green API atingiu o limite do plano (erro 466). O administrador precisa regularizar o plano da instância para liberar os envios ao grupo.");
+      throw new Error("Não foi possível enviar o código agora. Tente novamente mais tarde.");
     }
     if (response.status === 429) {
       throw new Error("O WhatsApp está recebendo muitas solicitações. Aguarde um minuto antes de pedir outro código.");
     }
-    throw new Error(`Não foi possível publicar o código no grupo. A Green API recusou o envio (HTTP ${response.status}).`);
+    throw new Error("Não foi possível publicar o código na comunidade agora. Tente novamente mais tarde.");
   }
 }
 
@@ -1216,7 +1216,7 @@ async function sendScheduledAdsterraReport(request: Request, announce = false, n
   const introduction = announce ? "✅ O painel agora traz CTR e CPM da API oficial, separados da receita. Este resumo semanal será enviado automaticamente todos os dias às 8h e às 20h (horário de Brasília).\n\n" : "";
   const message = `📊 *Urtador · Relatório Adsterra — últimos 7 dias*\n${introduction}🕒 Atualizado: ${now} (Brasília)\n${lines.join("\n")}\n\nCPM é a métrica por mil impressões. A receita é o valor informado separadamente pela API e pode ser ajustada pela rede.`;
   const notificationSent = await notifyCollaboratorGroup(message);
-  if (!notificationSent) throw new Error("O relatório foi consultado, mas não foi possível enviá-lo à comunidade. Confira a integração Green API do Urtador.");
+  if (!notificationSent) throw new Error("O relatório foi consultado, mas o aviso não pôde ser enviado à comunidade agora.");
   return json(request, 200, { ok: true, imported: rows.length, notificationSent: true, individualNotifications });
 }
 
@@ -1392,7 +1392,7 @@ async function adminAction(request: Request, payload: Payload) {
     const personLabel = person === "mateus" ? "Mateus · conta de exemplo final 9929" : "Fabio · conta de exemplo final 6164";
     const message = `🧪✨ *TESTE DO SISTEMA DE SAQUES* ✨🧪\n_Urtador · aviso para a comunidade_\n\n👤 *Conta de exemplo:* ${personLabel}\n💰 *Valor ilustrativo:* ${formatMoney(amountCents)}\n\n✅ Este teste verifica apenas o envio de avisos.\n🚫 Nenhum saque foi solicitado.\n💸 Nenhum Pix foi enviado ou confirmado.\n📊 Nenhum saldo foi alterado.`;
     const notificationSent = await notifyCollaboratorGroup(message);
-    if (!notificationSent) throw new Error("O aviso de teste não foi enviado. Confira a integração Green API e o ID da comunidade.");
+    if (!notificationSent) throw new Error("O aviso de teste não foi enviado à comunidade agora. Tente novamente mais tarde.");
     return { ok: true, notificationSent, message: "Aviso de teste enviado à comunidade. Nenhum dado financeiro foi alterado." };
   }
   if (payload.action === "admin-list") {

@@ -1166,7 +1166,7 @@
         adsenseTitle: el("adsense-title").value,
         adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value, owner: el(`banner-owner-${index + 1}`).value }))
       });
-      const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " Não foi possível enviar o aviso ao grupo; confira a conexão do WhatsApp.";
+      const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " O aviso não pôde ser enviado à comunidade agora.";
       say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) Adsterra na Guia e na etapa 2/2. O destino não depende de interação com o anúncio. O AdSense continua desligado até aprovação.${groupNotice}`);
       await refreshAdmin();
     } catch (error) {

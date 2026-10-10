@@ -19,8 +19,8 @@ Configure estes secrets em **Supabase → Edge Functions → Secrets** antes de 
 
 | Secret | Uso |
 | --- | --- |
-| `GREEN_API_URL` | URL da conta Green API usada para enviar os códigos |
-| `GREEN_API_INSTANCE_ID` | Instância autorizada do WhatsApp |
+| `GREEN_API_URL` | URL do serviço de mensagens usado para enviar os códigos |
+| `GREEN_API_INSTANCE_ID` | Instância autorizada do serviço de mensagens |
 | `GREEN_API_TOKEN` | Token da instância, guardado só no servidor |
 | `KUTT_AD_NOTIFICATION_GROUP_ID` | ID do grupo WhatsApp que recebe avisos após salvar anúncios |
 | `OWNER_PHONE` | Telefone principal de administração em formato internacional |
@@ -37,7 +37,7 @@ npx supabase@latest functions deploy kutt-short-links --project-ref ggufcvrwctie
 
 ## Avisos na comunidade do WhatsApp
 
-Para avisos do Urtador, usar a instância Green API de fallback do Validade PT260 definida no `.env` local (`GREEN_API_FALLBACK_URL`, `GREEN_API_FALLBACK_INSTANCE_ID`, `GREEN_API_FALLBACK_TOKEN`); o código do chatbot Validade também prioriza essa instância. Não usar as credenciais primárias de logística nem copiar tokens para este repositório. O grupo Kuttencurtador tem o ID `120363430513969812@g.us`.
+Para avisos do Urtador, usar a instância de mensagens de fallback do Validade PT260 definida no `.env` local (`GREEN_API_FALLBACK_URL`, `GREEN_API_FALLBACK_INSTANCE_ID`, `GREEN_API_FALLBACK_TOKEN`); o código do chatbot Validade também prioriza essa instância. Não usar as credenciais primárias de logística nem copiar tokens para este repositório. O grupo Kuttencurtador tem o ID `120363430513969812@g.us`.
 
 Antes de enviar, consultar `getGroupData` nessa instância com o ID acima e conferir que o grupo retornado é **Kuttencurtador** e que a instância pode publicar. Depois enviar o texto pelo endpoint `sendMessage` com `chatId` igual ao mesmo ID. Não imprimir URLs com token, valores de tokens, lista de membros nem mensagens privadas nos logs. O envio de 7 de outubro de 2026 confirmou o grupo e foi concluído com sucesso.
 
@@ -47,7 +47,7 @@ Links podem ser criados sem cadastro. Um identificador aleatório do navegador �
 
 ## Acesso e pagamentos
 
-No primeiro acesso, o telefone precisa estar entre os membros da comunidade Kuttencurtador. Um código de seis dígitos aparece ali junto do DDD e dos quatro últimos dígitos; só então a pessoa cadastra sua senha. O link para entrar na comunidade aparece na tela de acesso. O envio depende de uma instância Green API ativa, configurada como `GREEN_API_FALLBACK_URL`, `GREEN_API_FALLBACK_INSTANCE_ID` e `GREEN_API_FALLBACK_TOKEN` nos secrets do Supabase. A senha é armazenada como hash PBKDF2-SHA-256 com salt aleatório, nunca em texto aberto. Nas 48 horas após cada verificação da comunidade, a senha permite iniciar uma nova sessão; após esse prazo, a senha continua obrigatória e o sistema publica um novo código no grupo. Cada sessão expira em três horas. Os telefones em `OWNER_PHONE` e `ADMIN_PHONES` definem os administradores; esses números ficam nos secrets do Supabase, não no repositório público. Usuários comuns só veem os próprios links e cadastram a própria chave Pix. Após acumular R$ 70,00 em visitas qualificadas reais, podem pedir saques de no mínimo R$ 10,00 em múltiplos de R$ 10,00, até três pedidos por dia. O banco aplica os limites de forma atômica. O pedido avisa a comunidade com os quatro últimos dígitos do telefone e o valor. Fabio ou Matheus confere telefone, chave Pix e valor no painel; depois de enviar o Pix manualmente na Cora, um deles clica em “Eu enviei o Pix”. O botão apenas registra a confirmação, não transfere dinheiro.
+No primeiro acesso, o telefone precisa estar entre os membros da comunidade Kuttencurtador. Um código de seis dígitos aparece ali junto do DDD e dos quatro últimos dígitos; só então a pessoa cadastra sua senha. O link para entrar na comunidade aparece na tela de acesso. O envio depende de uma instância de mensagens ativa, configurada nos secrets do Supabase. A senha é armazenada como hash PBKDF2-SHA-256 com salt aleatório, nunca em texto aberto. Nas 48 horas após cada verificação da comunidade, a senha permite iniciar uma nova sessão; após esse prazo, a senha continua obrigatória e o sistema publica um novo código no grupo. Cada sessão expira em três horas. Os telefones em `OWNER_PHONE` e `ADMIN_PHONES` definem os administradores; esses números ficam nos secrets do Supabase, não no repositório público. Usuários comuns só veem os próprios links e cadastram a própria chave Pix. Após acumular R$ 70,00 em visitas qualificadas reais, podem pedir saques de no mínimo R$ 10,00 em múltiplos de R$ 10,00, até três pedidos por dia. O banco aplica os limites de forma atômica. O pedido avisa a comunidade com os quatro últimos dígitos do telefone e o valor. Fabio ou Matheus confere telefone, chave Pix e valor no painel; depois de enviar o Pix manualmente na Cora, um deles clica em “Eu enviei o Pix”. O botão apenas registra a confirmação, não transfere dinheiro.
 
 A API pública documentada pela Cora permite cobranças Pix recebidas e iniciação de certos pagamentos/transferências, mas não documenta transferência Pix de saída para pagar colaboradores. Portanto, os repasses do Urtador seguem manuais no app da Cora até a instituição disponibilizar uma API de saída Pix compatível.
 
