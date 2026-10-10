@@ -34,29 +34,35 @@
             <div id="auth-intro">
               <p class="eyebrow">Urtador • links e divulgação</p>
               <h1 id="main-title">Crie links curtos e acompanhe sua divulgação.</h1>
-              <p>Entre com seu telefone e senha. Na primeira entrada, confirme o WhatsApp e cadastre uma senha para facilitar os próximos acessos.</p>
+              <p>Entre com seu telefone e senha. No primeiro acesso e quando a confirmação for necessária, o código aparece na comunidade Kuttencurtador. Só números que já estão no grupo podem pedir o código.</p>
             </div>
             <section id="auth-view" class="panel" aria-label="Acesso por WhatsApp">
+              <aside class="community-access" aria-label="Comunidade necessária para receber o código">
+                <strong>Entre na comunidade para receber seu código de acesso</strong>
+                <a class="button secondary" href="https://chat.whatsapp.com/ELbtIPYBL8LDnr4p8huyPd" target="_blank" rel="noopener noreferrer">Entrar no grupo Kuttencurtador</a>
+                <small class="field-help">O grupo publica somente o código e o DDD com os quatro últimos dígitos do telefone. Cadastre usando o mesmo número que participa do grupo.</small>
+              </aside>
               <form id="password-login-form">
                 <div class="field"><label for="login-phone">Seu celular com DDD</label><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
                 <div class="field"><label for="login-password">Sua senha</label><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required></div>
                 <button class="button" type="submit">Entrar</button>
               </form>
-              <button class="button secondary" type="button" id="first-access-button">Primeiro acesso: receber código</button>
+              <button class="button secondary" type="button" id="first-access-button">Primeiro acesso: receber código no grupo</button>
               <button class="button secondary" type="button" id="forgot-password-button">Esqueci minha senha</button>
               <form id="password-recovery-form" hidden>
-                <p class="field-help">Informe o telefone cadastrado. Enviaremos um código de 6 dígitos para redefinir a senha.</p>
+                <p class="field-help">Informe o telefone cadastrado. Depois de confirmar que ele está no grupo, publicaremos o código lá para redefinir a senha.</p>
                 <div class="field"><label for="recovery-phone">Seu celular com DDD</label><input id="recovery-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
                 <button class="button" type="submit">Enviar código de recuperação</button>
                 <button class="button secondary" type="button" id="recovery-back">Voltar ao login</button>
               </form>
               <form id="otp-form" hidden>
+                <p class="field-help">Digite o código publicado no grupo Kuttencurtador ao lado do DDD e dos quatro últimos dígitos do telefone.</p>
                 <div class="field"><label for="otp">Código de 6 dígitos</label><input id="otp" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></div>
                 <button class="button" type="submit">Confirmar código</button>
                 <button class="button secondary" type="button" id="change-phone">Voltar</button>
               </form>
               <form id="set-password-form" hidden>
-                <p class="field-help" id="password-form-help">WhatsApp confirmado. Crie sua senha para concluir o primeiro acesso.</p>
+                <p class="field-help" id="password-form-help">Código do grupo confirmado. Crie sua senha para concluir o primeiro acesso.</p>
                 <div class="field"><label for="new-password">Crie uma senha</label><input id="new-password" name="password" type="password" autocomplete="new-password" minlength="10" maxlength="128" aria-describedby="password-help" required><small id="password-help" class="field-help">Use pelo menos 10 caracteres. Você usará essa senha nos próximos acessos.</small></div>
                 <div class="field"><label for="confirm-password">Confirme a senha</label><input id="confirm-password" name="password-confirm" type="password" autocomplete="new-password" minlength="10" maxlength="128" required></div>
                 <button class="button" type="submit">Salvar senha</button>
@@ -70,7 +76,7 @@
                 <div class="guest-link-output" id="guest-link-output" hidden><a id="guest-link-result" rel="noopener noreferrer"></a><button class="button secondary small" id="copy-guest-link" type="button">Copiar link</button></div>
                 <p class="message" id="draft-message" aria-live="polite"></p>
               </form>
-              <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação do WhatsApp; depois, pediremos senha e código novamente.</small>
+              <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação na comunidade; depois, pediremos senha e código novamente.</small>
             </section>
 
             <section id="dashboard-view" hidden>
@@ -131,7 +137,7 @@
                   <section class="workspace-page" data-dashboard-area="payouts" hidden>
                     <div class="workspace-two-column">
                       <section class="panel"><h3>Solicitar saque via Pix</h3><p class="field-help">É necessário ter saldo líquido disponível de pelo menos R$ 70,00, já descontadas as tarifas dos avisos e os saques anteriores, para liberar solicitações. Depois de atingir esse limite, cada pedido deve ser de no mínimo R$ 10,00, em múltiplos de R$ 10,00, com até 3 solicitações por dia. Um administrador confere e faz o Pix manualmente pela Cora; pedidos pendentes são avisados no grupo pelo final do telefone e valor.</p>
-                        <form id="pix-form"><div class="field"><label for="pix-key">Sua chave Pix</label><input id="pix-key" name="pixKey" maxlength="120" autocomplete="off" placeholder="CPF, celular, e-mail ou chave aleatória" required></div><button class="button secondary" type="submit">Salvar chave Pix</button></form>
+                        <form id="pix-form"><div class="field"><label for="pix-key">Sua chave Pix</label><input id="pix-key" name="pixKey" maxlength="120" autocomplete="off" placeholder="CPF, celular, e-mail ou chave aleatória" required></div><button class="button secondary" type="submit">Salvar chave Pix</button></form><p id="pix-confirmation-status" class="field-help">Confirme a chave salva pelo WhatsApp para identificar que ela está correta.</p><button class="button secondary" id="confirm-pix-whatsapp" type="button" hidden>Confirmar chave pelo WhatsApp</button><p class="message" id="pix-confirmation-message" aria-live="polite"></p>
                         <div class="field"><label for="withdrawal-amount">Valor do saque (R$)</label><input id="withdrawal-amount" type="number" min="10" step="10" value="10" inputmode="numeric"></div>
                         <button class="button" type="button" id="withdraw-button">Solicitar saque</button><p class="message" id="payout-message" aria-live="polite"></p>
                       </section>
@@ -144,7 +150,7 @@
                   </section>
 
                   <section class="workspace-page" data-dashboard-area="settings" hidden>
-                    <article class="settings-card"><h3>Conta e segurança</h3><div class="setting-row"><span>Telefone conectado</span><strong id="settings-phone">—</strong></div><div class="setting-row"><span>Perfil</span><strong id="settings-role">Usuário</strong></div><div class="setting-row"><span>Duração desta sessão</span><strong>3 horas</strong></div><div class="setting-row"><span>Confirmação pelo WhatsApp</span><strong>A cada 48 horas</strong></div><p>O Urtador não mostra nem solicita seu código fora da etapa de acesso. Para encerrar o acesso neste navegador, use “Sair” no menu.</p></article>
+                    <article class="settings-card"><h3>Conta e segurança</h3><div class="setting-row"><span>Telefone conectado</span><strong id="settings-phone">—</strong></div><div class="setting-row"><span>Perfil</span><strong id="settings-role">Usuário</strong></div><div class="setting-row"><span>Duração desta sessão</span><strong>3 horas</strong></div><div class="setting-row"><span>Confirmação de acesso</span><strong>Comunidade Kuttencurtador</strong></div><p>O Urtador não mostra nem solicita seu código fora da etapa de acesso. Para encerrar o acesso neste navegador, use “Sair” no menu.</p></article>
                   </section>
 
                   <section id="admin-panel" class="workspace-page panel dashboard-panel" data-dashboard-area="admin" hidden>

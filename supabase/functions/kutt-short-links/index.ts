@@ -15,6 +15,7 @@ type Payload = {
   reportEnd?: string;
   reportGroup?: "day" | "week" | "month";
   pixKey?: string;
+  idMessage?: string;
   amountCents?: number;
   testPerson?: "mateus" | "fabio";
   provider?: "adsense" | "adsterra";
@@ -45,15 +46,17 @@ const adminPhones = new Set([
   ...(Deno.env.get("ADMIN_PHONES") ?? "").split(",").map((phone) => phone.trim()).filter(Boolean).map(normalizePhone)
 ]);
 const otpPepper = Deno.env.get("OTP_PEPPER") ?? "";
-const greenApiUrl = (Deno.env.get("GREEN_API_URL") ?? "").replace(/\/$/, "");
-const greenApiInstance = Deno.env.get("GREEN_API_INSTANCE_ID") ?? "";
-const greenApiToken = Deno.env.get("GREEN_API_TOKEN") ?? "";
+const greenApiUrl = (Deno.env.get("GREEN_API_FALLBACK_URL") || Deno.env.get("GREEN_API_URL") || "").replace(/\/$/, "");
+const greenApiInstance = Deno.env.get("GREEN_API_FALLBACK_INSTANCE_ID") || Deno.env.get("GREEN_API_INSTANCE_ID") || "";
+const greenApiToken = Deno.env.get("GREEN_API_FALLBACK_TOKEN") || Deno.env.get("GREEN_API_TOKEN") || "";
+const kuttCommunityId = "120363430513969812@g.us";
 const adsenseOAuthClientId = Deno.env.get("ADSENSE_OAUTH_CLIENT_ID") ?? "";
 const adsenseOAuthClientSecret = Deno.env.get("ADSENSE_OAUTH_CLIENT_SECRET") ?? "";
 const adsensePublisherId = Deno.env.get("ADSENSE_PUBLISHER_ID") ?? "pub-6464589391694014";
 const adsterraApiToken = Deno.env.get("ADSTERRA_API_TOKEN") ?? "";
 const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? "").replace(/@g\.us$/i, "");
 const reportCronSecret = Deno.env.get("KUTT_REPORT_CRON_SECRET") ?? "";
+const pixConfirmationWebhookSecret = Deno.env.get("KUTT_PIX_CONFIRMATION_WEBHOOK_SECRET") ?? "";
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -191,7 +194,7 @@ async function requireUser(request: Request, payload: Payload, allowPasswordSetu
   if (!token || token.length < 20) throw new Error("Entre com seu telefone para continuar.");
   const tokenHash = await hash(token);
   const { data, error } = await supabase.from("kutt_sessions")
-    .select("id, expires_at, password_recovery, user:kutt_users(id, phone, role, pix_key, password_hash, payout_percent)")
+    .select("id, expires_at, password_recovery, user:kutt_users(id, phone, role, pix_key, pix_key_confirmed_at, password_hash, payout_percent)")
     .eq("token_hash", tokenHash).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
   if (error) throw error;
   if (!data?.user) throw new Error("Sua sessão expirou. Entre novamente pelo WhatsApp.");
@@ -225,8 +228,61 @@ async function sendWhatsApp(phone: string, message: string) {
   if (!response.ok || result?.error) throw new Error("O WhatsApp não aceitou o envio do código. Tente novamente mais tarde.");
 }
 
+async function ensureKuttCommunityMember(phone: string) {
+  if (!greenApiUrl || !greenApiInstance || !greenApiToken) {
+    throw new Error("O envio pelo grupo ainda não está configurado no servidor.");
+  }
+  const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/getGroupData/${encodeURIComponent(greenApiToken)}`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId: kuttCommunityId })
+    });
+  } catch {
+    throw new Error("Não consegui confirmar os membros da comunidade Kuttencurtador. Tente novamente mais tarde.");
+  }
+  if (!response.ok) {
+    throw new Error("A conexão do WhatsApp da comunidade está indisponível. A equipe precisa reativá-la.");
+  }
+  const group = await response.json().catch(() => ({}));
+  if (String(group?.subject ?? "").trim().toLocaleLowerCase("pt-BR") !== "kuttencurtador" || !Array.isArray(group?.participants)) {
+    throw new Error("Não consegui confirmar os membros da comunidade Kuttencurtador. Tente novamente mais tarde.");
+  }
+  const isMember = group.participants.some((participant: Record<string, unknown>) => {
+    const values = [participant.phoneNumber, participant.id, participant.lid];
+    return values.some((value) => {
+      const digits = String(value ?? "").split("@")[0].replace(/\D/g, "");
+      return digits === phone || digits === phone.slice(2);
+    });
+  });
+  if (!isMember) throw new Error("Este telefone ainda não está no grupo. Entre na comunidade pelo link e tente novamente.");
+}
+
+async function sendOtpToKuttCommunity(phone: string, code: string) {
+  const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
+  const digits = phone.slice(2);
+  const phoneEnding = `(${digits.slice(0, 2)}) ****-${digits.slice(-4)}`;
+  let response: Response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId: kuttCommunityId, message: `${phoneEnding} · ${code}` })
+    });
+  } catch {
+    throw new Error("Não foi possível publicar o código no grupo Kuttencurtador. Tente novamente mais tarde.");
+  }
+  const receipt = await response.json().catch(() => ({}));
+  if (!response.ok || receipt?.error || !receipt?.idMessage) {
+    throw new Error("Não foi possível publicar o código no grupo Kuttencurtador. A equipe precisa conferir a conexão do WhatsApp.");
+  }
+}
+
 async function issueOtp(request: Request, phone: string, passwordVerified: boolean, passwordRecovery = false) {
   await rateLimit(request, "otp-ip", 8, 60);
+  await ensureKuttCommunityMember(phone);
   const since = new Date(Date.now() - 15 * 60000).toISOString();
   const { count, error: countError } = await supabase.from("kutt_otp_challenges").select("id", { count: "exact", head: true })
     .eq("phone", phone).gte("created_at", since);
@@ -239,12 +295,12 @@ async function issueOtp(request: Request, phone: string, passwordVerified: boole
     .insert({ phone, code_hash: codeHash, expires_at: expiresAt, password_verified: passwordVerified, password_recovery: passwordRecovery }).select("id").single();
   if (error) throw error;
   try {
-    await sendWhatsApp(phone, `Seu código do Urtador é ${code}. Ele vence em 10 minutos. Não compartilhe este código.`);
+    await sendOtpToKuttCommunity(phone, code);
   } catch (err) {
     await supabase.from("kutt_otp_challenges").delete().eq("id", challenge.id);
     throw err;
   }
-  return { ok: true, message: "Código enviado pelo WhatsApp. Ele vale por 10 minutos." };
+  return { ok: true, message: "Código publicado no grupo Kuttencurtador. Ele vale por 10 minutos." };
 }
 
 async function requestOtp(request: Request, payload: Payload) {
@@ -262,7 +318,7 @@ async function requestPasswordRecovery(request: Request, payload: Payload) {
   const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash, password_salt").eq("phone", phone).maybeSingle();
   if (error) throw error;
   if (user?.password_hash && user.password_salt) await issueOtp(request, phone, false, true);
-  return { ok: true, message: "Se a conta puder recuperar a senha, enviaremos um código de 6 dígitos pelo WhatsApp. Confira as mensagens." };
+  return { ok: true, message: "Se a conta puder recuperar a senha, publicaremos um código de 6 dígitos no grupo Kuttencurtador." };
 }
 
 async function createSession(user: { id: string; phone: string; role: string; pix_key: string | null }, passwordRecovery = false) {
@@ -287,7 +343,7 @@ async function loginWithPassword(request: Request, payload: Payload) {
   const lastOtp = user.otp_verified_at ? new Date(user.otp_verified_at).getTime() : 0;
   if (Date.now() - lastOtp >= 48 * 60 * 60 * 1000) {
     await issueOtp(request, phone, true);
-    return { otpRequired: true, phone, message: "Senha confirmada. Digite também o código enviado pelo WhatsApp." };
+    return { otpRequired: true, phone, message: "Senha confirmada. Digite o código publicado no grupo Kuttencurtador." };
   }
   const role = adminPhones.has(phone) ? "admin" : "user";
   if (user.role !== role) {
@@ -317,14 +373,14 @@ async function setPassword(request: Request, payload: Payload) {
     if (revokeError) throw revokeError;
     return { ok: true, message: "Senha redefinida. Por segurança, outras sessões foram encerradas." };
   }
-  return { ok: true, message: "Senha cadastrada. Use-a nos próximos acessos; a cada 48 horas o WhatsApp também será confirmado." };
+  return { ok: true, message: "Senha cadastrada. Use-a nos próximos acessos; a cada 48 horas o código do grupo será confirmado." };
 }
 
 async function verifyOtp(request: Request, payload: Payload) {
   await rateLimit(request, "otp-verify-ip", 20, 60);
   const phone = normalizePhone(payload.phone ?? "");
   const code = String(payload.code ?? "").replace(/\D/g, "");
-  if (!/^\d{6}$/.test(code)) throw new Error("Digite os 6 números recebidos no WhatsApp.");
+  if (!/^\d{6}$/.test(code)) throw new Error("Digite os 6 números publicados no grupo Kuttencurtador.");
   const { data: challenge, error } = await supabase.from("kutt_otp_challenges").select("id, code_hash, attempts, password_verified, password_recovery")
     .eq("phone", phone).is("consumed_at", null).gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -374,7 +430,7 @@ async function profile(request: Request, payload: Payload) {
     ...notificationCharges.rows.map((row) => ({ ...row, kind: "Tarifa" })),
     ...notificationBonus.rows.map((row: Record<string, unknown>) => ({ ...row, kind: "Bônus da primeira mensagem" }))
   ].sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(b.service_day).localeCompare(String(a.service_day))).slice(0, 30);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, pixKeyConfirmedAt: user.pix_key_confirmed_at, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
 async function readReservedWithdrawalCents(userId: string) {
@@ -612,9 +668,135 @@ async function setPix(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   const pixKey = String(payload.pixKey ?? "").trim().slice(0, 120);
   if (pixKey.length < 5) throw new Error("Informe uma chave Pix válida.");
-  const { error } = await supabase.from("kutt_users").update({ pix_key: pixKey, updated_at: new Date().toISOString() }).eq("id", user.id);
+  const keyChanged = pixKey !== String(user.pix_key ?? "");
+  const { error } = await supabase.from("kutt_users").update({
+    pix_key: pixKey,
+    ...(keyChanged ? { pix_key_confirmed_at: null } : {}),
+    updated_at: new Date().toISOString()
+  }).eq("id", user.id);
   if (error) throw error;
-  return { ok: true, message: "Chave Pix salva para solicitar saques." };
+  if (keyChanged) {
+    await supabase.from("kutt_pix_confirmation_challenges").update({ expires_at: new Date().toISOString() })
+      .eq("user_id", user.id).is("confirmed_at", null);
+  }
+  return { ok: true, message: keyChanged ? "Chave Pix salva. Confirme-a pelo WhatsApp antes de fazer o próximo pedido." : "Chave Pix salva para solicitar saques." };
+}
+
+function maskPixKey(input: string) {
+  const key = input.trim();
+  if (key.includes("@")) {
+    const [local, domain] = key.split("@", 2);
+    return `${local.slice(0, 1)}•••@${domain}`;
+  }
+  const digits = key.replace(/\D/g, "");
+  if (digits.length >= 8 && digits.length === key.replace(/[./-]/g, "").length) return `••••••${digits.slice(-4)}`;
+  if (key.length <= 4) return "••••";
+  return `${key.slice(0, 1)}${"•".repeat(Math.min(12, Math.max(3, key.length - 5)))}${key.slice(-4)}`;
+}
+
+async function requestPixConfirmation(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload);
+  const pixKey = String(user.pix_key ?? "");
+  if (!pixKey) throw new Error("Salve uma chave Pix antes de pedir a confirmação pelo WhatsApp.");
+  if (user.pix_key_confirmed_at) return { ok: true, confirmed: true, message: "Esta chave Pix já está confirmada." };
+  await rateLimitIdentity("pix-confirmation", user.phone, 3, 60);
+  const code = String(Number.parseInt(bytesToHex(crypto.getRandomValues(new Uint8Array(4))).slice(0, 8), 16) % 1000000).padStart(6, "0");
+  const challenge = {
+    user_id: user.id,
+    pix_key_hash: await hash(`${user.phone}:${pixKey}:${otpPepper}`),
+    code_hash: await hash(`${user.phone}:${code}:${otpPepper}`),
+    expires_at: new Date(Date.now() + 10 * 60000).toISOString()
+  };
+  await supabase.from("kutt_pix_confirmation_challenges").update({ expires_at: new Date().toISOString() })
+    .eq("user_id", user.id).is("confirmed_at", null);
+  const { data: inserted, error } = await supabase.from("kutt_pix_confirmation_challenges")
+    .insert(challenge).select("id").single();
+  if (error) throw error;
+  const message = `🔐 *Confirmação da chave Pix · Urtador*\n\nChave salva: ${maskPixKey(pixKey)}\n\nPara confirmar que está correta, responda nesta conversa com:\n*CONFIRMAR PIX ${code}*\n\nO código vence em 10 minutos e pode ser usado uma vez. Nunca envie sua chave Pix completa no grupo.`;
+  try {
+    await sendWhatsApp(user.phone, message);
+  } catch (error) {
+    await supabase.from("kutt_pix_confirmation_challenges").delete().eq("id", inserted.id);
+    throw error;
+  }
+  return { ok: true, sent: true, message: "Enviamos ao seu WhatsApp a chave mascarada e um código de 6 dígitos. Responda CONFIRMAR PIX seguido do código para concluir." };
+}
+
+async function handlePixConfirmationWebhook(request: Request, payload: Record<string, any>) {
+  const suppliedSecret = bearer(request);
+  if (!pixConfirmationWebhookSecret || !secureEqual(suppliedSecret, pixConfirmationWebhookSecret)) {
+    return json(request, 401, { error: "Acesso não autorizado." });
+  }
+  if (payload.typeWebhook !== "incomingMessageReceived" || payload.messageData?.typeMessage !== "textMessage") {
+    return json(request, 200, { ignored: true });
+  }
+  const senderData = payload.senderData ?? {};
+  const chatId = String(senderData.chatId ?? senderData.chat_id ?? payload.chatId ?? "");
+  const senderId = String(senderData.sender ?? senderData.senderId ?? "");
+  if (!chatId.endsWith("@c.us") || (senderId.endsWith("@c.us") && senderId !== chatId)) {
+    return json(request, 200, { ignored: true });
+  }
+  const rawMessage = String(payload.messageData?.textMessageData?.textMessage ?? payload.messageData?.extendedTextMessageData?.text ?? "").trim();
+  const match = rawMessage.match(/^CONFIRMAR\s+PIX\s+(\d{6})$/i);
+  if (!match) return json(request, 200, { ignored: true });
+  const messageId = String(payload.idMessage ?? "");
+  if (!/^[A-Za-z0-9_-]{5,160}$/.test(messageId)) return json(request, 200, { ignored: true });
+  const phone = normalizePhone(chatId.slice(0, -5));
+  const greenEndpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/getMessage/${encodeURIComponent(greenApiToken)}`;
+  let verifiedMessage: Record<string, any>;
+  try {
+    const response = await fetch(greenEndpoint, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chatId, idMessage: messageId }), signal: AbortSignal.timeout(15000)
+    });
+    if (!response.ok) return json(request, 200, { ignored: true });
+    verifiedMessage = await response.json();
+  } catch {
+    return json(request, 503, { error: "Não foi possível validar a mensagem do WhatsApp." });
+  }
+  const verifiedText = String(verifiedMessage.textMessage ?? "").trim();
+  if (verifiedMessage.type !== "incoming" || verifiedMessage.idMessage !== messageId || verifiedMessage.chatId !== chatId ||
+      (verifiedMessage.senderId && verifiedMessage.senderId !== chatId) || !secureEqual(verifiedText.toUpperCase(), rawMessage.toUpperCase())) {
+    return json(request, 200, { ignored: true });
+  }
+  const { data: user, error: userError } = await supabase.from("kutt_users")
+    .select("id, phone, pix_key, pix_key_confirmed_at").eq("phone", phone).maybeSingle();
+  if (userError) throw userError;
+  if (!user?.pix_key || user.pix_key_confirmed_at) return json(request, 200, { ignored: true });
+  const { data: challenge, error: challengeError } = await supabase.from("kutt_pix_confirmation_challenges")
+    .select("id, pix_key_hash, code_hash, attempts, created_at, expires_at")
+    .eq("user_id", user.id).is("confirmed_at", null).gt("expires_at", new Date().toISOString())
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  if (challengeError) throw challengeError;
+  if (!challenge || Number(challenge.attempts) >= 5) {
+    await sendWhatsApp(phone, "Não há confirmação Pix ativa para esse número. Peça um novo código no painel do Urtador.");
+    return json(request, 200, { handled: true, confirmed: false });
+  }
+  const expectedCodeHash = await hash(`${phone}:${match[1]}:${otpPepper}`);
+  const currentPixKeyHash = await hash(`${phone}:${user.pix_key}:${otpPepper}`);
+  const challengeFresh = new Date(Number(verifiedMessage.timestamp) * 1000).getTime() >= new Date(challenge.created_at).getTime();
+  if (!challengeFresh || !secureEqual(expectedCodeHash, challenge.code_hash) || !secureEqual(currentPixKeyHash, challenge.pix_key_hash)) {
+    const attempts = Number(challenge.attempts) + 1;
+    await supabase.from("kutt_pix_confirmation_challenges").update({
+      attempts,
+      ...(attempts >= 5 ? { expires_at: new Date().toISOString() } : {})
+    }).eq("id", challenge.id).eq("attempts", challenge.attempts);
+    await sendWhatsApp(phone, attempts >= 5
+      ? "O código não foi confirmado após 5 tentativas. Peça outro pelo painel do Urtador."
+      : "Código Pix incorreto ou expirado. Confira o último código enviado pelo painel.");
+    return json(request, 200, { handled: true, confirmed: false });
+  }
+  const confirmedAt = new Date().toISOString();
+  const { data: updatedUser, error: confirmError } = await supabase.from("kutt_users")
+    .update({ pix_key_confirmed_at: confirmedAt, updated_at: confirmedAt })
+    .eq("id", user.id).eq("pix_key", user.pix_key).is("pix_key_confirmed_at", null).select("id").maybeSingle();
+  if (confirmError) throw confirmError;
+  if (!updatedUser) return json(request, 200, { handled: true, confirmed: false });
+  const { error: challengeUpdateError } = await supabase.from("kutt_pix_confirmation_challenges")
+    .update({ confirmed_at: confirmedAt }).eq("id", challenge.id).is("confirmed_at", null);
+  if (challengeUpdateError) throw challengeUpdateError;
+  await sendWhatsApp(phone, `✅ Sua chave Pix ${maskPixKey(user.pix_key)} foi confirmada no Urtador. Ela está pronta para os próximos pedidos de saque pelo painel.`);
+  return json(request, 200, { handled: true, confirmed: true });
 }
 
 async function logout(request: Request, payload: Payload) {
@@ -1250,6 +1432,9 @@ Deno.serve(async (request) => {
   if (!supabaseUrl || !serviceRoleKey || !otpPepper) return json(request, 500, { error: "Backend sem configuração completa." });
   try {
     const payload = await request.json() as Payload;
+    if (request.headers.get("x-kutt-hook-action") === "pix-confirmation") {
+      return await handlePixConfirmationWebhook(request, payload as Record<string, any>);
+    }
     if (payload.action === "scheduled-adsterra-report") return await sendScheduledAdsterraReport(request, payload.announce === true, payload.notifySlot);
     switch (payload.action) {
       case "request-otp": return json(request, 200, await requestOtp(request, payload));
@@ -1258,6 +1443,7 @@ Deno.serve(async (request) => {
       case "login-password": return json(request, 200, await loginWithPassword(request, payload));
       case "set-password": return json(request, 200, await setPassword(request, payload));
       case "me": return json(request, 200, await profile(request, payload));
+      case "request-pix-confirmation": return json(request, 200, await requestPixConfirmation(request, payload));
       case "my-ad-revenue-report": return json(request, 200, await personalAdRevenueReport(request, payload));
       case "set-ad-revenue-notifications": return json(request, 200, await setAdRevenueNotificationPreference(request, payload));
       case "create": return json(request, 200, await createLink(request, payload));

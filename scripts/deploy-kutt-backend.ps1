@@ -52,6 +52,16 @@ if ($configuredGreenApiNames.Count -gt 0 -and $configuredGreenApiNames.Count -ne
 if ($configuredGreenApiNames.Count -eq $greenApiNames.Count) {
   foreach ($name in $greenApiNames) { $secretLines += "$name=$($kutt[$name])" }
 }
+$kuttGreenApiNames = @('KUTT_GREEN_API_URL', 'KUTT_GREEN_API_INSTANCE_ID', 'KUTT_GREEN_API_TOKEN')
+$configuredKuttGreenApiNames = @($kuttGreenApiNames | Where-Object { $kutt[$_] })
+if ($configuredKuttGreenApiNames.Count -gt 0 -and $configuredKuttGreenApiNames.Count -ne $kuttGreenApiNames.Count) {
+  throw 'Configure as três variáveis KUTT_GREEN_API_* no .envkutt ou deixe todas ausentes para manter a configuração atual.'
+}
+if ($configuredKuttGreenApiNames.Count -eq $kuttGreenApiNames.Count) {
+  $secretLines += "GREEN_API_FALLBACK_URL=$($kutt['KUTT_GREEN_API_URL'])"
+  $secretLines += "GREEN_API_FALLBACK_INSTANCE_ID=$($kutt['KUTT_GREEN_API_INSTANCE_ID'])"
+  $secretLines += "GREEN_API_FALLBACK_TOKEN=$($kutt['KUTT_GREEN_API_TOKEN'])"
+}
 $googleCredentialsPath = Join-Path $workspaceRoot 'credentials.json'
 if (Test-Path -LiteralPath $googleCredentialsPath) {
   $googleCredentials = Get-Content -LiteralPath $googleCredentialsPath -Raw | ConvertFrom-Json

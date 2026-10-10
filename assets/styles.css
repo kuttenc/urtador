@@ -176,6 +176,19 @@ input {
   padding: 20px;
 }
 
+.community-access {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(13, 31, 51, 0.72);
+}
+
+.community-access .button { width: fit-content; }
+.community-access .field-help { margin: 0; line-height: 1.45; }
+
 .field {
   display: grid;
   gap: 8px;
