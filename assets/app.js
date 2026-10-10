@@ -550,6 +550,22 @@
     el("overview-reward-rule").textContent = overviewHasRate
       ? `Sua participação: ${overviewPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% da base interna de ${money(overviewBaseCents)} por 1.000 visitas. Válido enquanto essa regra permanecer ativa.`
       : "Não foi possível obter a tarifa atual. Atualize o painel para consultar a previsão.";
+    const revenuePolicy = data.rewardPolicy;
+    if (revenuePolicy?.model === "adsterra_share") {
+      const estimate = Number(revenuePolicy.estimatedPerThousandCents);
+      const hasEstimate = revenuePolicy.estimatedPerThousandCents != null && Number.isFinite(estimate);
+      el("overview-thousand-reward").textContent = hasEstimate
+        ? `≈ ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", minimumFractionDigits: 2, maximumFractionDigits: 4 }).format(estimate / 100)}`
+        : "Em apuração";
+      el("overview-projection-caption").textContent = hasEstimate
+        ? "de repasse bruto estimado para 1.000 novas visitas."
+        : "— a previsão aparecerá quando houver receita e visitas apuradas.";
+      el("overview-reward-rule").textContent = `70% da receita informada pela Adsterra são divididos pelas visitas qualificadas dos usuários; 30% ficam com a administração. O teto é ${money(revenuePolicy.capPerThousandCents)} por 1.000 visitas, sem valor mínimo garantido.`;
+      el("overview-reward-explanation").textContent = hasEstimate
+        ? `Referência: ${Number(revenuePolicy.sampleVisits).toLocaleString("pt-BR")} visitas entre ${dateOnly(revenuePolicy.sampleStart)} e ${dateOnly(revenuePolicy.sampleEnd)}, em dias com relatório. A previsão varia conforme a receita; estimativas de CPM não geram saldo. Ganhos anteriores à nova regra foram preservados.`
+        : "As visitas de hoje aguardam o fechamento do dia e a receita informada pela Adsterra. A previsão pode variar; estimativas de CPM não geram saldo. Ganhos anteriores à nova regra foram preservados.";
+      el("overview-pending-rewards").textContent = `${Number(data.pendingRewardVisits || 0).toLocaleString("pt-BR")} visita(s) aguardando apuração de receita. Frações de centavo são acumuladas antes de compor o saldo.`;
+    }
     el("earnings-visits").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);
@@ -590,6 +606,9 @@
     const payoutPercent = Number(data.user.payoutPercent ?? 100);
     const rewardBaseCents = Number(data.rewardBaseCents ?? 7000);
     el("earnings-rate").textContent = `Seu repasse está em ${payoutPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% do valor-base: ${money(Math.round(rewardBaseCents * payoutPercent / 100))} por mil visitas qualificadas futuras.`;
+    if (revenuePolicy?.model === "adsterra_share") {
+      el("earnings-rate").textContent = `Repasse variável: 70% da receita Adsterra são divididos entre os usuários conforme suas visitas, com teto de ${money(revenuePolicy.capPerThousandCents)} por 1.000 visitas. Administração: 30%. ${Number(data.pendingRewardVisits || 0).toLocaleString("pt-BR")} visita(s) aguardando apuração. Saldos anteriores à mudança foram preservados.`;
+    }
     el("pix-key").value = data.user.pixKey || "";
     const linksBody = el("links-body");
     linksBody.replaceChildren();
@@ -728,6 +747,12 @@
       const details = document.createElement("small"); details.className = "admin-user-details";
       details.textContent = `${item.role === "admin" ? "Administrador" : "Colaborador"} · Cadastro ${date(item.created_at)} · Pix: ${item.pix_key || "não cadastrada"}`;
       accountCell.append(phone, details); row.append(accountCell);
+      if (adConfiguration.rewardModel === "adsterra_share") {
+        cell(row, `70% da receita rateada por visitas · teto ${money(Math.min(rewardBaseCents, 7000))}/mil`);
+        cell(row, "Regra única para todos");
+        usersBody.append(row);
+        continue;
+      }
       const rateCell = document.createElement("td"); rateCell.className = "admin-user-rate-cell";
       const rateControl = document.createElement("div"); rateControl.className = "admin-user-rate-control";
       const rateInput = document.createElement("input");
@@ -1112,16 +1137,16 @@
     event.preventDefault();
     const button = event.currentTarget.querySelector('button[type="submit"]');
     const amount = Number(el("reward-base-value").value);
-    if (!Number.isFinite(amount) || amount < 0 || amount > 500) {
-      say(el("reward-base-message"), "Informe um valor entre R$ 0,00 e R$ 500,00.", true);
+    if (!Number.isFinite(amount) || amount < 0 || amount > 70) {
+      say(el("reward-base-message"), "Informe um teto entre R$ 0,00 e R$ 70,00.", true);
       return;
     }
     button.disabled = true;
-    say(el("reward-base-message"), "Salvando valor-base…");
+    say(el("reward-base-message"), "Salvando teto…");
     try {
       const result = await api("admin-set-reward-base", { rewardBaseCents: Math.round(amount * 100) });
       const notice = result.notificationSent ? "Aviso enviado à comunidade." : "O valor foi salvo, mas o aviso do WhatsApp não foi enviado; confira a integração do grupo.";
-      say(el("reward-base-message"), `Valor salvo: ${money(result.rewardBaseCents)} por mil visitas qualificadas. ${notice}`, !result.notificationSent);
+      say(el("reward-base-message"), `Teto salvo: até ${money(result.rewardBaseCents)} por mil visitas qualificadas, limitado a 70% da receita rateada. ${notice}`, !result.notificationSent);
       await refreshAdmin();
     } catch (error) {
       say(el("reward-base-message"), error.message, true);

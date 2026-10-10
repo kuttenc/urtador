@@ -107,9 +107,10 @@
                     </div>
                     <article class="support-card">
                       <h3>Previsão para 1.000 novas visitas qualificadas</h3>
-                      <p><strong id="overview-thousand-reward">—</strong> de repasse bruto pela regra atual.</p>
+                      <p><strong id="overview-thousand-reward">—</strong> <span id="overview-projection-caption">de repasse bruto pela regra atual.</span></p>
                       <p id="overview-reward-rule"></p>
-                      <p>O saldo acumulado usa a regra vigente em cada visita, com bônus e tarifas já registrados. A previsão usa a tarifa atual e não inclui bônus, tarifas ou saques. Visitas qualificadas não equivalem a impressões de anúncios; esse repasse não é a receita nem o lucro da Adsterra.</p>
+                      <p id="overview-reward-explanation">O saldo acumulado usa a regra vigente em cada visita, com bônus e tarifas já registrados. A previsão não inclui bônus, tarifas ou saques.</p>
+                      <p id="overview-pending-rewards"></p>
                       <p id="overview-withdrawal-status" aria-live="polite"></p>
                     </article>
                   </section>
@@ -135,7 +136,7 @@
                       <article class="balance-card"><span>Tarifas dos avisos</span><strong id="earnings-notification-fees">R$ 0,00</strong></article>
                       <article class="balance-card"><span>Bônus recebido</span><strong id="earnings-notification-bonus">R$ 0,00</strong></article>
                     </div>
-                      <article class="earnings-note"><h3>Como ler estes números</h3><p id="earnings-rate">Seu percentual e a estimativa por mil visitas aparecerão aqui.</p><p>O saldo conta uma abertura confirmada por visitante e colaborador por dia, depois do clique em “Abrir destino”. Visualizações, robôs, repetição no mesmo dia e seus próprios acessos não geram repasse. Isso não representa cliques em anúncios, CPM nem receita confirmada do Google; saques são conferidos manualmente.</p></article>
+                      <article class="earnings-note"><h3>Como ler estes números</h3><p id="earnings-rate">A regra de repasse e a estimativa por mil visitas aparecerão aqui.</p><p>O saldo conta uma abertura confirmada por visitante e colaborador por dia, depois do clique em “Abrir destino”. Visualizações, robôs, repetição no mesmo dia e seus próprios acessos não geram repasse. Novas visitas aguardam a receita diária informada pela Adsterra; estimativas de CPM não geram crédito. A rede pode revisar a receita reportada e a apuração será atualizada. Saques são conferidos manualmente.</p></article>
                     <section class="panel earnings-links-panel"><h3>Seus links e acessos</h3><p class="field-help">Links criados nesta conta e cliques únicos qualificados registrados para cada um.</p><div class="table-wrap"><table><thead><tr><th>Nome</th><th>Link curto</th><th>Acessos</th><th>Criado</th></tr></thead><tbody id="earnings-links-body"></tbody></table></div></section>
                     <section class="panel personal-ad-revenue-panel"><h3>Estimativa de participação nos anúncios</h3><p class="field-help">A Adsterra informa receita agregada do site, sem identificar usuário ou link. Esta estimativa distribui o valor do dia pela participação das suas visitas qualificadas no total de visitas qualificadas do Urtador; não altera seu saldo nem confirma pagamento.</p><form id="personal-ad-report-form" class="ad-config-form"><div class="ad-code-grid admin-report-filters"><label class="field"><span>De</span><input id="personal-ad-report-start" type="date" required></label><label class="field"><span>Até</span><input id="personal-ad-report-end" type="date" required></label></div><button class="button" type="submit">Gerar meu relatório</button><button class="button secondary" id="export-personal-ad-report" type="button" disabled>Baixar CSV diário</button><p id="personal-ad-report-message" class="message" aria-live="polite"></p></form><div class="table-wrap"><table><thead><tr><th>Data</th><th>Suas visitas / total</th><th>Participação</th><th>Parcela estimada</th><th>Base</th></tr></thead><tbody id="personal-ad-report-body"><tr><td colspan="5">Selecione o período e gere seu relatório.</td></tr></tbody></table></div></section>
                     <section class="panel ad-notification-preferences"><h3>Resumo diário no WhatsApp</h3><p class="field-help">A primeira mensagem é grátis e adiciona R$ 0,01 ao seu saldo; depois do envio, os avisos são desligados automaticamente. Para reativar, é necessário ter <strong>mais de R$ 70,00 disponíveis</strong>. Com seu aceite, os avisos reativados chegam às 8h e às 20h (horário de Brasília), até 2 por dia. A tarifa é de <strong>R$ 0,01 por dia em que ao menos um aviso for enviado</strong>, cobrada no máximo uma vez por dia, mesmo se você ativar/desativar várias vezes ou receber os dois avisos. O saldo pode ficar negativo; ganhos futuros cobrem primeiro esse valor. Você pode desativar a qualquer momento; cobranças já registradas não são estornadas.</p><label class="ad-config-toggle"><input id="ad-revenue-notification-consent" type="checkbox"> Li e aceito a tarifa de R$ 0,01 por dia com envio após a mensagem grátis, inclusive a possibilidade de saldo negativo.</label><p id="ad-revenue-notification-status" class="field-help">Avisos desativados.</p><button class="button" id="enable-ad-revenue-notifications" type="button">Ativar avisos</button><button class="button secondary" id="disable-ad-revenue-notifications" type="button" hidden>Desativar avisos</button><p id="ad-revenue-notification-message" class="message" aria-live="polite"></p><details><summary>Ver tarifas e bônus registrados</summary><div class="table-wrap"><table><thead><tr><th>Data</th><th>Movimento</th></tr></thead><tbody id="ad-notification-charges-body"><tr><td colspan="2">Nenhum movimento registrado.</td></tr></tbody></table></div></details></section>
@@ -279,13 +280,13 @@
                       </form>
                     </details>
                     <details class="admin-section">
-                      <summary><span>Valor-base interno por mil visitas</span><span class="admin-section-toggle">Abrir</span></summary>
-                    <p class="field-help">Este é o valor de repasse do Urtador para visitas qualificadas; não é o CPM nem a receita real de anúncios. A mudança vale para visitas futuras. Cada registro guarda o valor vigente na data.</p>
-                    <form id="reward-base-form" class="ad-config-form"><label class="field"><span>Valor-base (R$ por 1.000 visitas qualificadas)</span><input id="reward-base-value" type="number" min="0" max="500" step="0.01" required></label><button class="button" type="submit">Salvar valor-base</button><p id="reward-base-message" class="message" aria-live="polite"></p></form>
+                      <summary><span>Teto de repasse por mil visitas</span><span class="admin-section-toggle">Abrir</span></summary>
+                    <p class="field-help">Todos os usuários dividem 70% da receita informada pela Adsterra, proporcionalmente às visitas qualificadas do dia. A administração retém 30%; o teto abaixo pode reduzir ainda mais o repasse. Valores antigos são preservados. Cada visita nova guarda o teto vigente e aguarda a apuração da receita.</p>
+                    <form id="reward-base-form" class="ad-config-form"><label class="field"><span>Teto (R$ por 1.000 visitas qualificadas)</span><input id="reward-base-value" type="number" min="0" max="70" step="0.01" required></label><button class="button" type="submit">Salvar teto</button><p id="reward-base-message" class="message" aria-live="polite"></p></form>
                     </details>
                     <details class="admin-section">
                       <summary><span>Usuários e repasse</span><span class="admin-section-toggle">Abrir</span></summary>
-                      <p class="field-help">Ajuste o percentual do valor-base para cada conta. O valor estimado por mil visitas aparece junto ao campo; mudanças valem para visitas futuras.</p><div class="table-wrap admin-users-wrap"><table class="admin-users-table"><thead><tr><th>Conta</th><th>Repasse por 1.000 visitas</th><th>Ação</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
+                      <p class="field-help">A regra de 70% da receita, com 30% para a administração, vale igualmente para todas as contas. Os percentuais individuais antigos são mantidos somente no histórico.</p><div class="table-wrap admin-users-wrap"><table class="admin-users-table"><thead><tr><th>Conta</th><th>Regra de repasse</th><th>Ação</th></tr></thead><tbody id="admin-users-body"></tbody></table></div>
                     </details>
                     <details class="admin-section">
                       <summary><span>Links criados</span><span class="admin-section-toggle">Abrir</span></summary>
@@ -357,6 +358,6 @@
     <script src="assets/config.js?v=20261008-adsense-oauth"></script>
     <script src="assets/country-dial-codes.js?v=20261009-ddi-fixed"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="assets/app.js?v=20261009-panel-reward"></script>
+    <script src="assets/app.js?v=20261009-revenue-share"></script>
   </body>
 </html>

@@ -421,6 +421,7 @@ async function verifyOtp(request: Request, payload: Payload) {
 
 async function profile(request: Request, payload: Payload) {
   const { user, session } = await requireUser(request, payload);
+  await refreshRevenueRewards();
   const { data: links, error } = await supabase.from("kutt_short_links")
     .select("id, slug, target_url, title, created_at, qualified_click_count").eq("owner_user_id", user.id).order("created_at", { ascending: false }).limit(100);
   if (error) throw error;
@@ -442,12 +443,13 @@ async function profile(request: Request, payload: Payload) {
   ]);
   if (notificationPreference.error) throw notificationPreference.error;
   const rewardBaseCents = await currentRewardBaseCents();
+  const rewardPolicy = await readRewardPolicy();
   const earnedCents = rewards.earnedCents - notificationCharges.totalCents + notificationBonus.totalCents;
   const notificationLedger: Record<string, unknown>[] = [
     ...notificationCharges.rows.map((row) => ({ ...row, kind: "Tarifa" })),
     ...notificationBonus.rows.map((row: Record<string, unknown>) => ({ ...row, kind: "Bônus da primeira mensagem" }))
   ].sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(b.service_day).localeCompare(String(a.service_day))).slice(0, 30);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, pixKeyConfirmedAt: user.pix_key_confirmed_at, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, pixKeyConfirmedAt: user.pix_key_confirmed_at, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, rewardPolicy, pendingRewardVisits: rewards.pendingVisits, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
 async function readReservedWithdrawalCents(userId: string) {
@@ -584,19 +586,57 @@ async function personalAdRevenueReport(request: Request, payload: Payload) {
 }
 
 async function readRewardBalance(userId: string) {
-  const pageSize = 1000;
-  let visitCount = 0;
-  let rewardNumerator = 0;
-  for (let offset = 0; ; offset += pageSize) {
-    const { data, error } = await supabase.from("kutt_reward_visits").select("payout_percent, reward_base_cents")
-      .eq("owner_user_id", userId).order("id", { ascending: true }).range(offset, offset + pageSize - 1);
-    if (error) throw error;
-    const rows = data ?? [];
-    visitCount += rows.length;
-    for (const row of rows) rewardNumerator += Math.round(Number(row.payout_percent ?? 100) * 100) * Number(row.reward_base_cents ?? 7000);
-    if (rows.length < pageSize) break;
+  const { data, error } = await supabase.rpc("kutt_read_reward_balance", { p_user_id: userId });
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("Não foi possível consultar o saldo registrado.");
+  return { visitCount: Number(row.visit_count), earnedCents: Number(row.earned_cents), pendingVisits: Number(row.pending_visits) };
+}
+
+async function refreshRevenueRewards() {
+  const { data: cached, error } = await supabase.from("kutt_reward_fx").select("usd_brl, quoted_at, updated_at").eq("id", true).maybeSingle();
+  if (error) throw error;
+  if (!cached || Date.now() - new Date(cached.updated_at).getTime() > 12 * 60 * 60 * 1000) {
+    // Separate from the Adsterra importer: preserve its original amounts in USD.
+    try {
+      const response = await fetch("https://open.er-api.com/v6/latest/USD", { signal: AbortSignal.timeout(5000) });
+      const quote = await response.json();
+      const rate = Number(quote?.rates?.BRL);
+      const quotedAt = new Date(Number(quote?.time_last_update_unix) * 1000);
+      if (!response.ok || quote?.result !== "success" || !(rate > 0) || !Number.isFinite(rate)
+        || Number.isNaN(quotedAt.getTime()) || quotedAt.getTime() > Date.now() + 300000
+        || Date.now() - quotedAt.getTime() > 48 * 60 * 60 * 1000) throw new Error("Cotação indisponível.");
+      const { error: saveError } = await supabase.from("kutt_reward_fx").upsert({
+        id: true, usd_brl: rate, quoted_at: quotedAt.toISOString(), updated_at: new Date().toISOString()
+      });
+      if (saveError) throw saveError;
+    } catch {
+      console.warn("reward_fx_refresh_unavailable");
+    }
   }
-  return { visitCount, earnedCents: Math.floor(rewardNumerator / 10_000_000) };
+  const { error: reconciliationError } = await supabase.rpc("kutt_reconcile_ad_rewards");
+  if (reconciliationError) throw reconciliationError;
+}
+
+async function readRewardPolicy() {
+  const { data: config, error } = await supabase.from("kutt_ad_configuration")
+    .select("reward_model, reward_base_cents").eq("id", true).maybeSingle();
+  if (error) throw error;
+  const model = config?.reward_model ?? "adsterra_share";
+  const capCents = Math.min(Number(config?.reward_base_cents ?? 7000), 7000);
+  const end = saoPauloDay();
+  const start = new Date(new Date(`${end}T00:00:00Z`).getTime() - 7 * 86400000).toISOString().slice(0, 10);
+  const { data: days, error: dayError } = await supabase.from("kutt_reward_revenue_days")
+    .select("report_date, qualified_visits, rate_per_thousand_cents, applied_at")
+    .gte("report_date", start).lt("report_date", end).order("report_date", { ascending: true });
+  if (dayError) throw dayError;
+  const sampleVisits = (days ?? []).reduce((sum, day) => sum + Number(day.qualified_visits), 0);
+  const rateNumerator = (days ?? []).reduce((sum, day) => sum
+    + Math.min(capCents, Number(day.rate_per_thousand_cents)) * Number(day.qualified_visits), 0);
+  return { model, publisherPercent: 70, administrationPercent: 30, capPerThousandCents: capCents,
+    estimatedPerThousandCents: sampleVisits > 0 ? rateNumerator / sampleVisits : null,
+    sampleVisits, sampleDays: days?.length ?? 0, sampleStart: days?.[0]?.report_date ?? null,
+    sampleEnd: days?.length ? days[days.length - 1].report_date : null };
 }
 
 async function currentRewardBaseCents() {
@@ -825,6 +865,7 @@ async function logout(request: Request, payload: Payload) {
 
 async function requestWithdrawal(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
+  await refreshRevenueRewards();
   const amount = Math.round(Number(payload.amountCents));
   if (!Number.isSafeInteger(amount) || amount < 1000 || amount % 1000 !== 0) {
     throw new Error("Informe um valor a partir de R$ 10,00, em múltiplos de R$ 10,00.");
@@ -880,6 +921,7 @@ async function readRowsBetween(table: string, columns: string, orderBy: string, 
 }
 
 async function adminReport(payload: Payload) {
+  await refreshRevenueRewards();
   const start = validReportDay(payload.reportStart);
   const end = validReportDay(payload.reportEnd);
   const group = payload.reportGroup ?? "day";
@@ -1156,6 +1198,7 @@ async function sendScheduledAdsterraReport(request: Request, announce = false, n
     const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
     if (error) throw error;
   }
+  await refreshRevenueRewards();
   const individualNotifications = notifySlot
     ? await sendUserAdRevenueNotifications(rows, start, today, notifySlot)
     : { sent: 0, failed: 0 };
@@ -1179,13 +1222,14 @@ async function sendScheduledAdsterraReport(request: Request, announce = false, n
 
 async function readAdConfiguration() {
   const { data, error } = await supabase.from("kutt_ad_configuration")
-    .select("adsense_enabled, adsense_title, adsterra_slots, reward_base_cents").eq("id", true).maybeSingle();
+    .select("adsense_enabled, adsense_title, adsterra_slots, reward_base_cents, reward_model").eq("id", true).maybeSingle();
   if (error) throw error;
   const slots = Array.isArray(data?.adsterra_slots) ? data.adsterra_slots : [];
   return {
     adsenseEnabled: Boolean(data?.adsense_enabled),
     adsenseTitle: String(data?.adsense_title ?? ""),
     rewardBaseCents: Number(data?.reward_base_cents ?? 7000),
+    rewardModel: data?.reward_model ?? "adsterra_share",
     slots: slots.map((slot: Record<string, unknown>) => ({ ...slot, script: formatAdsterraBanner(slot) }))
   };
 }
@@ -1236,6 +1280,7 @@ async function adminAction(request: Request, payload: Payload) {
       updated_by: user.id
     }, { onConflict: "provider,report_date" }).select("provider, report_date, impressions, clicks, revenue_cents, currency_code, updated_at").single();
     if (error) throw error;
+    if (provider === "adsterra") await refreshRevenueRewards();
     return { ok: true, row: data, message: "Dados do relatório oficial salvos. Se já existia um registro do mesmo provedor e dia, ele foi atualizado." };
   }
   if (payload.action === "admin-ad-revenue-import-adsense-api") {
@@ -1336,6 +1381,7 @@ async function adminAction(request: Request, payload: Payload) {
       const { error } = await supabase.from("kutt_ad_revenue_reports").upsert(rows, { onConflict: "provider,report_date" });
       if (error) throw error;
     }
+    await refreshRevenueRewards();
     return { ok: true, imported: rows.length, message: `${rows.length} dia(s) importado(s) diretamente da API Adsterra. Receita mantida em USD, moeda do relatório.` };
   }
   if (payload.action === "admin-test-withdrawal-notice") {
@@ -1361,6 +1407,9 @@ async function adminAction(request: Request, payload: Payload) {
   }
   if (payload.action === "admin-report") return await adminReport(payload);
   if (payload.action === "admin-set-user-payout") {
+    if ((await readAdConfiguration()).rewardModel === "adsterra_share") {
+      throw new Error("A regra é igual para todos: 70% da receita Adsterra rateada pelas visitas, com teto de R$ 70 por mil. Percentuais individuais antigos não se aplicam a novas visitas.");
+    }
     const userId = String(payload.userId ?? "");
     const payoutPercent = Number(payload.payoutPercent);
     if (!/^[0-9a-f-]{36}$/i.test(userId)) throw new Error("Selecione um colaborador válido.");
@@ -1383,7 +1432,7 @@ async function adminAction(request: Request, payload: Payload) {
   }
   if (payload.action === "admin-set-reward-base") {
     const rewardBaseCents = Number(payload.rewardBaseCents);
-    if (!Number.isInteger(rewardBaseCents) || rewardBaseCents < 0 || rewardBaseCents > 50000) throw new Error("O valor-base deve ficar entre R$ 0,00 e R$ 500,00 por mil visitas qualificadas.");
+    if (!Number.isInteger(rewardBaseCents) || rewardBaseCents < 0 || rewardBaseCents > 7000) throw new Error("O teto deve ficar entre R$ 0,00 e R$ 70,00 por mil visitas qualificadas.");
     const previousRewardBaseCents = await currentRewardBaseCents();
     const { error } = await supabase.from("kutt_ad_configuration").upsert({
       id: true,
@@ -1393,7 +1442,7 @@ async function adminAction(request: Request, payload: Payload) {
     }, { onConflict: "id" });
     if (error) throw error;
     const formatMoney = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(cents / 100);
-    const notificationSent = await notifyCollaboratorGroup(`📊 Valor-base interno de ganhos atualizado no Urtador\nAntes: ${formatMoney(previousRewardBaseCents)} por mil visitas qualificadas.\nAgora: ${formatMoney(rewardBaseCents)} por mil visitas qualificadas.\nA nova regra vale para visitas futuras; visitas registradas mantêm o valor anterior. Isso não representa CPM nem receita de anúncios.`);
+    const notificationSent = await notifyCollaboratorGroup(`📊 Teto de ganhos atualizado no Urtador\nAntes: ${formatMoney(previousRewardBaseCents)} por mil visitas qualificadas.\nAgora: até ${formatMoney(rewardBaseCents)} por mil visitas qualificadas.\nO repasse é limitado a 70% da receita Adsterra, dividido pelas visitas qualificadas. O teto novo vale para visitas futuras; saldos anteriores são preservados.`);
     return { ok: true, rewardBaseCents, notificationSent };
   }
   if (payload.action === "admin-save-ad-configuration") {
