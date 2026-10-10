@@ -12,7 +12,7 @@
     <meta property="og:title" content="Urtador — links curtos para o seu negócio">
     <meta property="og:description" content="Organize e compartilhe links curtos para atendimento, cardápios e campanhas.">
     <title>Urtador — encurtador de links em português</title>
-    <link rel="stylesheet" href="assets/styles.css?v=20261009-auth-refresh">
+    <link rel="stylesheet" href="assets/styles.css?v=20261009-ddi">
   <script async src="https://www.googletagmanager.com/gtag/js?id=AW-18495877040"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -43,7 +43,7 @@
                 <small class="field-help">O grupo publica somente o código e o DDD com os quatro últimos dígitos do telefone. Cadastre usando o mesmo número que participa do grupo.</small>
               </aside>
               <form id="password-login-form">
-                <div class="field"><label for="login-phone">Seu celular com DDD</label><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
+                <div class="field"><label for="login-dial-code">País e DDI</label><select id="login-dial-code" class="country-dial-select" autocomplete="country"></select><label for="login-phone">Celular com DDD</label><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 99999-9999" maxlength="20" required></div>
                 <div class="field"><label for="login-password">Sua senha</label><input id="login-password" name="password" type="password" autocomplete="current-password" minlength="10" maxlength="128" required></div>
                 <button class="button" type="submit">Entrar</button>
               </form>
@@ -51,7 +51,7 @@
               <button class="button secondary" type="button" id="forgot-password-button">Esqueci minha senha</button>
               <form id="password-recovery-form" hidden>
                 <p class="field-help">Informe o telefone cadastrado. Depois de confirmar que ele está no grupo, publicaremos o código lá para redefinir a senha.</p>
-                <div class="field"><label for="recovery-phone">Seu celular com DDD</label><input id="recovery-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="(11) 99999-9999" required></div>
+                <div class="field"><label for="recovery-dial-code">País e DDI</label><select id="recovery-dial-code" class="country-dial-select" autocomplete="country"></select><label for="recovery-phone">Celular com DDD</label><input id="recovery-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 99999-9999" maxlength="20" required></div>
                 <button class="button" type="submit">Enviar código de recuperação</button>
                 <button class="button secondary" type="button" id="recovery-back">Voltar ao login</button>
               </form>
@@ -348,7 +348,8 @@
       <footer class="site-footer"><p>Urtador — ferramenta independente para criar e compartilhar links curtos.</p><nav aria-label="Links legais e suporte"><a href="guia.html">Guia</a><a href="sobre.html">Sobre</a><a href="privacidade.html">Política de privacidade</a><a href="termos.html">Termos de uso</a><a href="https://github.com/kuttenc/urtador/issues" target="_blank" rel="noopener noreferrer">Contato e suporte</a></nav><p class="footer-note">Use o serviço com responsabilidade. Não encurte nem divulgue links abusivos ou enganosos.</p></footer>
     </div>
     <script src="assets/config.js?v=20261008-adsense-oauth"></script>
+    <script src="assets/country-dial-codes.js?v=20261009-ddi"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="assets/app.js?v=20261009-auth-refresh"></script>
+    <script src="assets/app.js?v=20261009-ddi"></script>
   </body>
 </html>

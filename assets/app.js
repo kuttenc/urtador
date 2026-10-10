@@ -35,6 +35,52 @@
     script: `<script>\n  atOptions = {\n    'key' : '02033b78716daab542298321e0a8d3a6',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src="https://bauval.org/22/02033b78716daab542298321e0a8d3a6"></script>`
   };
   const el = (id) => document.getElementById(id);
+  const countryDialCodes = Array.isArray(window.KuttCountryDialCodes) ? window.KuttCountryDialCodes : [];
+  function populateDialSelect(selectId) {
+    const select = el(selectId);
+    if (!select) return;
+    const displayNames = new Intl.DisplayNames([navigator.language || "pt-BR"], { type: "region" });
+    for (const country of countryDialCodes) {
+      const option = document.createElement("option");
+      option.value = country.iso2;
+      option.dataset.dialCode = country.dialCode;
+      option.textContent = `${displayNames.of(country.iso2.toUpperCase()) || country.name} (+${country.dialCode})`;
+      select.append(option);
+    }
+    select.value = "br";
+  }
+  function countryForPhone(digits) {
+    return countryDialCodes
+      .filter((country) => digits.startsWith(country.dialCode))
+      .sort((a, b) => b.dialCode.length - a.dialCode.length)[0];
+  }
+  function phoneForRequest(inputId, selectId) {
+    const input = el(inputId);
+    const select = el(selectId);
+    let national = String(input?.value || "").trim();
+    let digits = national.replace(/\D/g, "");
+    if (/^\s*\+|^\s*00/.test(national)) {
+      if (national.trimStart().startsWith("00")) digits = digits.slice(2);
+      const country = countryForPhone(digits);
+      if (country) {
+        select.value = country.iso2;
+        digits = digits.slice(country.dialCode.length);
+        input.value = digits;
+      }
+    }
+    const dialCode = select.selectedOptions[0]?.dataset.dialCode || "55";
+    return `+${dialCode}${digits}`;
+  }
+  function restorePhoneInput(phone, inputId, selectId) {
+    const digits = String(phone || "").replace(/\D/g, "");
+    const country = countryForPhone(digits);
+    if (country) {
+      el(selectId).value = country.iso2;
+      el(inputId).value = digits.slice(country.dialCode.length);
+    }
+  }
+  populateDialSelect("login-dial-code");
+  populateDialSelect("recovery-dial-code");
   let adsenseTokenClient = null;
   const adsenseOAuthStorageKey = "urtador-adsense-oauth-client-id";
   const adsenseOAuthClientId = () => String(storage.getItem(adsenseOAuthStorageKey) || config.adsenseOAuthClientId || "").trim();
@@ -806,7 +852,7 @@
 
   el("password-login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const phone = el("login-phone").value.trim();
+    const phone = phoneForRequest("login-phone", "login-dial-code");
     const password = el("login-password").value;
     state.phone = phone; storage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Conferindo seus dados…");
@@ -831,7 +877,7 @@
   el("first-access-button")?.addEventListener("click", async () => {
     const phoneInput = el("login-phone");
     if (!phoneInput.reportValidity()) return;
-    const phone = phoneInput.value.trim();
+    const phone = phoneForRequest("login-phone", "login-dial-code");
     state.phone = phone; storage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Confirmando se seu telefone está na comunidade…");
     try {
@@ -842,6 +888,7 @@
   });
 
   el("forgot-password-button")?.addEventListener("click", () => {
+    el("recovery-dial-code").value = el("login-dial-code").value;
     el("recovery-phone").value = el("login-phone").value.trim();
     showAuth("recovery");
     say(el("auth-message"), "");
@@ -855,7 +902,7 @@
 
   el("password-recovery-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const phone = el("recovery-phone").value.trim();
+    const phone = phoneForRequest("recovery-phone", "recovery-dial-code");
     state.phone = phone;
     storage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Confirmando sua participação e pedindo o código no grupo…");
@@ -1336,7 +1383,10 @@
   if (el("ad-revenue-start")) el("ad-revenue-start").value = `${reportDate.slice(0, 8)}01`;
   if (el("ad-revenue-end")) el("ad-revenue-end").value = reportDate;
   if (el("ad-revenue-date")) el("ad-revenue-date").value = reportDate;
-  if (state.phone) el("login-phone").value = state.phone;
+  if (state.phone) {
+    restorePhoneInput(state.phone, "login-phone", "login-dial-code");
+    restorePhoneInput(state.phone, "recovery-phone", "recovery-dial-code");
+  }
   if (state.token && state.passwordRecovery) {
     showAuth("set-password");
     el("password-form-help").textContent = "Código da comunidade confirmado. Escolha uma nova senha para recuperar o acesso.";

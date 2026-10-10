@@ -66,9 +66,12 @@ function formatMoney(cents: number) {
 }
 
 function normalizePhone(input: string) {
-  let digits = String(input).replace(/\D/g, "");
-  if (digits.length === 10 || digits.length === 11) digits = `55${digits}`;
-  if (!/^55\d{10,11}$/.test(digits)) throw new Error("Informe um celular brasileiro com DDD.");
+  const source = String(input).trim();
+  const explicitInternationalCode = /^\s*\+|^\s*00/.test(source);
+  let digits = source.replace(/\D/g, "");
+  if (/^00/.test(source)) digits = digits.slice(2);
+  if (!explicitInternationalCode && (digits.length === 10 || digits.length === 11)) digits = `55${digits}`;
+  if (!/^\d{8,15}$/.test(digits)) throw new Error("Informe o telefone com DDI e DDD.");
   return digits;
 }
 
@@ -254,7 +257,7 @@ async function ensureKuttCommunityMember(phone: string) {
     const values = [participant.phoneNumber, participant.id, participant.lid];
     return values.some((value) => {
       const digits = String(value ?? "").split("@")[0].replace(/\D/g, "");
-      return digits === phone || digits === phone.slice(2);
+      return digits === phone || (phone.startsWith("55") && digits === phone.slice(2));
     });
   });
   if (!isMember) throw new Error("Este telefone ainda não está no grupo. Entre na comunidade pelo link e tente novamente.");
@@ -281,7 +284,8 @@ async function sendOtpToKuttCommunity(phone: string, code: string) {
 }
 
 async function issueOtp(request: Request, phone: string, passwordVerified: boolean, passwordRecovery = false) {
-  await rateLimit(request, "otp-ip", 8, 60);
+  const isAdmin = adminPhones.has(phone);
+  await rateLimit(request, isAdmin ? "otp-admin-ip" : "otp-ip", isAdmin ? 12 : 8, 60);
   await ensureKuttCommunityMember(phone);
   const since = new Date(Date.now() - 15 * 60000).toISOString();
   const { count, error: countError } = await supabase.from("kutt_otp_challenges").select("id", { count: "exact", head: true })
@@ -313,8 +317,9 @@ async function requestOtp(request: Request, payload: Payload) {
 
 async function requestPasswordRecovery(request: Request, payload: Payload) {
   const phone = normalizePhone(payload.phone ?? "");
-  await rateLimit(request, "password-recovery-ip", 6, 60);
-  await rateLimitIdentity("password-recovery-phone", phone, 4, 15);
+  const isAdmin = adminPhones.has(phone);
+  await rateLimit(request, isAdmin ? "password-recovery-admin-ip" : "password-recovery-ip", isAdmin ? 12 : 6, 60);
+  await rateLimitIdentity(isAdmin ? "password-recovery-admin-phone" : "password-recovery-phone", phone, isAdmin ? 8 : 4, 15);
   const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash, password_salt").eq("phone", phone).maybeSingle();
   if (error) throw error;
   if (user?.password_hash && user.password_salt) await issueOtp(request, phone, false, true);

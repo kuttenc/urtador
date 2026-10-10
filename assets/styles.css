@@ -27,7 +27,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -225,6 +226,7 @@ input {
 }
 
 .field input,
+.field select,
 .field textarea {
   width: 100%;
   min-height: 48px;
@@ -239,6 +241,7 @@ input {
 
 .field textarea { min-height: 110px; resize: vertical; font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace; }
 .field input:focus,
+.field select:focus,
 .field textarea:focus {
   border-color: var(--brand);
   box-shadow: 0 0 0 4px rgba(32, 217, 149, 0.18);
@@ -246,6 +249,8 @@ input {
 
 .field input::placeholder,
 .field textarea::placeholder { color: #6f86a4; opacity: 1; }
+
+.field .country-dial-select { max-height: 48px; cursor: pointer; }
 
 .actions {
   display: flex;
@@ -691,7 +696,7 @@ body.dashboard-mode main > .content-section { display: none; }
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .layout, .layout > *, .hero, #auth-view, .panel, .login-art, .field, .field input, .field textarea { width: 100%; min-width: 0; max-width: 100%; }
+  .layout, .layout > *, .hero, #auth-view, .panel, .login-art, .field, .field input, .field select, .field textarea { width: 100%; min-width: 0; max-width: 100%; }
   .hero > * { max-width: 100%; }
   .hero p { overflow-wrap: anywhere; }
 
