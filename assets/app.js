@@ -531,7 +531,26 @@
     el("admin-nav-item").hidden = data.user.role !== "admin";
     el("sidebar-phone").textContent = data.user.phone;
     el("settings-phone").textContent = data.user.phone;
+    el("settings-account-number").textContent = `Conta ${Number(data.user.accountNumber || 1)}`;
     el("settings-role").textContent = data.user.role === "admin" ? "Administrador" : "Usuário";
+    const linkedAccounts = Array.isArray(data.linkedAccounts) ? data.linkedAccounts : [{ accountNumber: 1, ready: true }];
+    const accountSelect = el("login-account-number");
+    if (accountSelect) {
+      for (const option of accountSelect.options) {
+        const account = linkedAccounts.find((item) => Number(item.accountNumber) === Number(option.value));
+        option.disabled = !account?.ready;
+        option.textContent = Number(option.value) === 1 ? "Conta 1 · principal" : `Conta ${option.value}${account?.ready ? " · vinculada" : " · ainda não criada"}`;
+      }
+    }
+    const linkedList = el("linked-account-list");
+    if (linkedList) {
+      linkedList.replaceChildren();
+      for (const account of linkedAccounts) {
+        const item = document.createElement("li");
+        item.textContent = `Conta ${account.accountNumber}: ${account.ready ? "pronta para entrar com a própria senha" : "aguardando criação"}`;
+        linkedList.append(item);
+      }
+    }
     showDashboardPage(state.activeDashboardPage || "overview");
     el("welcome-title").textContent = `Olá, ${data.user.phone}`;
     el("session-expiry").textContent = `Sua sessão expira às ${new Date(data.expiresAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
@@ -913,7 +932,7 @@
     state.phone = phone; storage.setItem("urtador-phone", phone);
     say(el("auth-message"), "Conferindo seus dados…");
     try {
-      const result = await api("login-password", { phone, password });
+      const result = await api("login-password", { phone, password, accountNumber: Number(el("login-account-number")?.value || 1) });
       if (result.otpRequired) {
         showAuth("otp");
         say(el("auth-message"), "Senha confirmada. Digite o código publicado na comunidade Kuttencurtador.");
@@ -928,6 +947,24 @@
       await refreshDashboard();
       say(el("auth-message"), "Acesso confirmado.");
     } catch (error) { if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), friendlyAuthError(error), true); }
+  });
+
+  el("linked-account-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const password = el("linked-account-password").value;
+    const confirmation = el("linked-account-password-confirm").value;
+    if (password !== confirmation) { say(el("linked-account-message"), "As senhas não conferem.", true); return; }
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    say(el("linked-account-message"), "Criando conta vinculada…");
+    try {
+      const result = await api("create-linked-account", { password });
+      el("linked-account-password").value = "";
+      el("linked-account-password-confirm").value = "";
+      say(el("linked-account-message"), `${result.message} Para entrar nela, saia e escolha Conta ${result.accountNumber}.`);
+      await refreshDashboard();
+    } catch (error) { say(el("linked-account-message"), error.message, true); }
+    finally { button.disabled = false; }
   });
 
   el("first-access-button")?.addEventListener("click", async () => {

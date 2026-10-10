@@ -6,6 +6,7 @@ type Payload = {
   code?: string;
   adsenseAuthCode?: string;
   password?: string;
+  accountNumber?: number;
   token?: string;
   url?: string;
   slug?: string;
@@ -198,7 +199,7 @@ async function requireUser(request: Request, payload: Payload, allowPasswordSetu
   if (!token || token.length < 20) throw new Error("Entre com seu telefone para continuar.");
   const tokenHash = await hash(token);
   const { data, error } = await supabase.from("kutt_sessions")
-    .select("id, expires_at, password_recovery, user:kutt_users(id, phone, role, pix_key, pix_key_confirmed_at, password_hash, payout_percent)")
+    .select("id, expires_at, password_recovery, user:kutt_users(id, phone, role, pix_key, pix_key_confirmed_at, password_hash, payout_percent, account_group_id, account_number)")
     .eq("token_hash", tokenHash).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
   if (error) throw error;
   if (!data?.user) throw new Error("Sua sessão expirou. Entre novamente pelo WhatsApp.");
@@ -349,14 +350,16 @@ async function createSession(user: { id: string; phone: string; role: string; pi
 
 async function loginWithPassword(request: Request, payload: Payload) {
   const phone = normalizePhone(payload.phone ?? "");
+  const accountNumber = Number(payload.accountNumber ?? 1);
+  if (!Number.isInteger(accountNumber) || accountNumber < 1 || accountNumber > 3) throw new Error("Escolha uma conta válida de 1 a 3.");
   await rateLimit(request, adminPhones.has(phone) ? "password-login-admin-ip" : "password-login-ip", 12, 60);
   await rateLimitIdentity("password-login-phone", phone, 8, 15);
   const password = validatePassword(payload.password);
   const { data: user, error } = await supabase.from("kutt_users")
     .select("id, phone, role, pix_key, password_hash, password_salt, otp_verified_at")
-    .eq("phone", phone).maybeSingle();
+    .eq("phone", phone).eq("account_number", accountNumber).maybeSingle();
   if (error) throw error;
-  if (!user?.password_hash || !user.password_salt) throw new Error("Primeiro acesso: confirme seu WhatsApp para cadastrar uma senha.");
+  if (!user?.password_hash || !user.password_salt) throw new Error("Essa conta ainda não foi criada. Entre na conta principal e crie-a no painel.");
   const candidate = await derivePasswordHash(password, user.password_salt);
   if (!secureEqual(candidate, user.password_hash)) throw new Error("Telefone ou senha incorretos.");
   const lastOtp = user.otp_verified_at ? new Date(user.otp_verified_at).getTime() : 0;
@@ -370,6 +373,21 @@ async function loginWithPassword(request: Request, payload: Payload) {
     if (roleError) throw roleError;
   }
   return await createSession({ ...user, role });
+}
+
+async function createLinkedAccount(request: Request, payload: Payload) {
+  const { user } = await requireUser(request, payload);
+  const password = validatePassword(payload.password);
+  const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  const passwordHash = await derivePasswordHash(password, salt);
+  const { data, error } = await supabase.rpc("kutt_create_linked_account", {
+    p_parent_user_id: user.id, p_password_hash: passwordHash, p_password_salt: salt
+  });
+  if (error) throw error;
+  const created = Array.isArray(data) ? data[0] : data;
+  if (!created?.id) throw new Error("Não foi possível criar a conta vinculada.");
+  return { ok: true, accountNumber: Number(created.account_number), phone: created.phone,
+    message: `Conta ${created.account_number} criada. Ela usa uma senha própria; guarde-a com segurança.` };
 }
 
 async function setPassword(request: Request, payload: Payload) {
@@ -409,7 +427,7 @@ async function verifyOtp(request: Request, payload: Payload) {
     await supabase.from("kutt_otp_challenges").update({ attempts: challenge.attempts + 1 }).eq("id", challenge.id);
     throw new Error("Código incorreto. Confira a mensagem e tente de novo.");
   }
-  const { data: knownUser, error: knownUserError } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).maybeSingle();
+  const { data: knownUser, error: knownUserError } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).eq("account_number", 1).maybeSingle();
   if (knownUserError) throw knownUserError;
   if (knownUser?.password_hash && !challenge.password_verified && !challenge.password_recovery) throw new Error("Esta conta exige a senha antes do código do WhatsApp.");
   await supabase.from("kutt_otp_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id);
@@ -451,7 +469,10 @@ async function profile(request: Request, payload: Payload) {
     ...notificationCharges.rows.map((row) => ({ ...row, kind: "Tarifa" })),
     ...notificationBonus.rows.map((row: Record<string, unknown>) => ({ ...row, kind: "Bônus da primeira mensagem" }))
   ].sort((a: Record<string, unknown>, b: Record<string, unknown>) => String(b.service_day).localeCompare(String(a.service_day))).slice(0, 30);
-  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, pixKeyConfirmedAt: user.pix_key_confirmed_at, payoutPercent: Number(user.payout_percent ?? 100) }, rewardBaseCents, rewardPolicy, pendingRewardVisits: rewards.pendingVisits, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
+  const { data: linkedAccounts, error: linkedError } = await supabase.from("kutt_users")
+    .select("id, account_number, password_hash").eq("account_group_id", user.account_group_id).order("account_number", { ascending: true });
+  if (linkedError) throw linkedError;
+  return { user: { phone: user.phone, role: user.role, pixKey: user.pix_key, pixKeyConfirmedAt: user.pix_key_confirmed_at, payoutPercent: Number(user.payout_percent ?? 100), accountGroupId: user.account_group_id, accountNumber: Number(user.account_number ?? 1) }, linkedAccounts: (linkedAccounts ?? []).map((item) => ({ accountNumber: Number(item.account_number), ready: Boolean(item.password_hash) })), rewardBaseCents, rewardPolicy, pendingRewardVisits: rewards.pendingVisits, expiresAt: session.expires_at, links: links ?? [], eligibleVisits: rewards.visitCount, rawLinkVisits: eligibleVisits ?? 0, grossEarnedCents: rewards.earnedCents, notificationFeesCents: notificationCharges.totalCents, notificationBonusCents: notificationBonus.totalCents, notificationCharges: notificationLedger, adRevenueNotifications: notificationPreference.data ?? { enabled: false }, earnedCents, reservedCents, availableCents: Math.max(0, earnedCents - reservedCents), withdrawals: withdrawals ?? [] };
 }
 
 async function readReservedWithdrawalCents(userId: string) {
@@ -1511,6 +1532,7 @@ Deno.serve(async (request) => {
       case "verify-otp": return json(request, 200, await verifyOtp(request, payload));
       case "login-password": return json(request, 200, await loginWithPassword(request, payload));
       case "set-password": return json(request, 200, await setPassword(request, payload));
+      case "create-linked-account": return json(request, 200, await createLinkedAccount(request, payload));
       case "me": return json(request, 200, await profile(request, payload));
       case "request-pix-confirmation": return json(request, 200, await requestPixConfirmation(request, payload));
       case "my-ad-revenue-report": return json(request, 200, await personalAdRevenueReport(request, payload));
