@@ -44,7 +44,11 @@
       const option = document.createElement("option");
       option.value = country.iso2;
       option.dataset.dialCode = country.dialCode;
-      option.textContent = `+${country.dialCode} · ${displayNames.of(country.iso2.toUpperCase()) || country.name}`;
+      const countryName = displayNames.of(country.iso2.toUpperCase()) || country.name;
+      // Keep the closed field compact; the full country name remains available
+      // as a native option title while the DDI stays easy to scan.
+      option.textContent = `+${country.dialCode}`;
+      option.title = `${countryName} · +${country.dialCode}`;
       select.append(option);
     }
     select.value = "br";
