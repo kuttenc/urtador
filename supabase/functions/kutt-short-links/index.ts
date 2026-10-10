@@ -279,7 +279,17 @@ async function sendOtpToKuttCommunity(phone: string, code: string) {
   }
   const receipt = await response.json().catch(() => ({}));
   if (!response.ok || receipt?.error || !receipt?.idMessage) {
-    throw new Error("Não foi possível publicar o código no grupo Kuttencurtador. A equipe precisa conferir a conexão do WhatsApp.");
+    console.error("community_otp_rejected", JSON.stringify({
+      status: response.status,
+      quotaStatus: receipt?.correspondentsStatus?.status || receipt?.invokeStatus?.status || null
+    }));
+    if (response.status === 466) {
+      throw new Error("O código não foi enviado: a Green API atingiu o limite do plano (erro 466). O administrador precisa regularizar o plano da instância para liberar os envios ao grupo.");
+    }
+    if (response.status === 429) {
+      throw new Error("O WhatsApp está recebendo muitas solicitações. Aguarde um minuto antes de pedir outro código.");
+    }
+    throw new Error(`Não foi possível publicar o código no grupo. A Green API recusou o envio (HTTP ${response.status}).`);
   }
 }
 
