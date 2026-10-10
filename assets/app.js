@@ -533,7 +533,23 @@
     el("session-expiry").textContent = `Sua sessão expira às ${new Date(data.expiresAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}.`;
     el("eligible-count").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earned-balance").textContent = money(data.earnedCents);
-    el("available-balance").textContent = money(data.availableCents);
+    const overviewAvailableCents = Math.max(0, Number(data.availableCents) || 0);
+    const overviewWithdrawalCents = overviewAvailableCents >= 7000
+      ? Math.floor(overviewAvailableCents / 1000) * 1000 : 0;
+    el("available-balance").textContent = money(overviewWithdrawalCents);
+    el("overview-withdrawal-status").textContent = overviewAvailableCents < 7000
+      ? `O saque é liberado a partir de R$ 70,00 disponíveis. Faltam ${money(7000 - overviewAvailableCents)} para atingir esse mínimo. Seu saldo acumulado continua registrado.`
+      : "O saldo permite solicitar saque em múltiplos de R$ 10,00. A solicitação também depende da chave Pix cadastrada e do limite de 3 pedidos por dia.";
+    const overviewPercent = Number(data.user.payoutPercent);
+    const overviewBaseCents = Number(data.rewardBaseCents);
+    const overviewHasRate = data.user.payoutPercent != null && data.rewardBaseCents != null
+      && Number.isFinite(overviewPercent) && overviewPercent >= 0 && overviewPercent <= 100
+      && Number.isFinite(overviewBaseCents) && overviewBaseCents >= 0;
+    el("overview-thousand-reward").textContent = overviewHasRate
+      ? money(Math.floor(overviewBaseCents * Math.round(overviewPercent * 100) / 10000)) : "Indisponível";
+    el("overview-reward-rule").textContent = overviewHasRate
+      ? `Sua participação: ${overviewPercent.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}% da base interna de ${money(overviewBaseCents)} por 1.000 visitas. Válido enquanto essa regra permanecer ativa.`
+      : "Não foi possível obter a tarifa atual. Atualize o painel para consultar a previsão.";
     el("earnings-visits").textContent = Number(data.eligibleVisits || 0).toLocaleString("pt-BR");
     el("earnings-total").textContent = money(data.earnedCents);
     el("earnings-available").textContent = money(data.availableCents);

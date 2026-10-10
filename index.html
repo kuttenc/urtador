@@ -101,11 +101,17 @@
 
                   <section class="workspace-page" data-dashboard-area="overview">
                     <div class="balance-grid">
-                      <article class="balance-card"><span>Visitas qualificadas</span><strong id="eligible-count">0</strong></article>
-                      <article class="balance-card"><span>Saldo líquido</span><strong id="earned-balance">R$ 0,00</strong></article>
-                      <article class="balance-card"><span>Disponível para solicitar</span><strong id="available-balance">R$ 0,00</strong></article>
+                      <article class="balance-card"><span>Visitas qualificadas acumuladas</span><strong id="eligible-count">0</strong></article>
+                      <article class="balance-card"><span>Saldo interno líquido</span><strong id="earned-balance">R$ 0,00</strong></article>
+                      <article class="balance-card"><span>Saldo elegível para saque</span><strong id="available-balance">R$ 0,00</strong></article>
                     </div>
-                    <article class="support-card"><h3>Seu painel em um só lugar</h3><p>Crie e acompanhe seus links, confira o saldo registrado e gerencie solicitações de pagamento pelo menu. Os dados são atualizados ao entrar e após cada operação.</p></article>
+                    <article class="support-card">
+                      <h3>Previsão para 1.000 novas visitas qualificadas</h3>
+                      <p><strong id="overview-thousand-reward">—</strong> de repasse bruto pela regra atual.</p>
+                      <p id="overview-reward-rule"></p>
+                      <p>O saldo acumulado usa a regra vigente em cada visita, com bônus e tarifas já registrados. A previsão usa a tarifa atual e não inclui bônus, tarifas ou saques. Visitas qualificadas não equivalem a impressões de anúncios; esse repasse não é a receita nem o lucro da Adsterra.</p>
+                      <p id="overview-withdrawal-status" aria-live="polite"></p>
+                    </article>
                   </section>
 
                   <section class="workspace-page" data-dashboard-area="links" hidden>
@@ -351,6 +357,6 @@
     <script src="assets/config.js?v=20261008-adsense-oauth"></script>
     <script src="assets/country-dial-codes.js?v=20261009-ddi-fixed"></script>
     <script src="https://accounts.google.com/gsi/client" async defer></script>
-    <script src="assets/app.js?v=20261009-enter-code"></script>
+    <script src="assets/app.js?v=20261009-panel-reward"></script>
   </body>
 </html>
