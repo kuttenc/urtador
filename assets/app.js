@@ -44,7 +44,7 @@
       const option = document.createElement("option");
       option.value = country.iso2;
       option.dataset.dialCode = country.dialCode;
-      option.textContent = `${displayNames.of(country.iso2.toUpperCase()) || country.name} (+${country.dialCode})`;
+      option.textContent = `+${country.dialCode} · ${displayNames.of(country.iso2.toUpperCase()) || country.name}`;
       select.append(option);
     }
     select.value = "br";

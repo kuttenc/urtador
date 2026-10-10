@@ -250,7 +250,9 @@ select {
 .field input::placeholder,
 .field textarea::placeholder { color: #6f86a4; opacity: 1; }
 
-.field .country-dial-select { max-height: 48px; cursor: pointer; }
+.phone-input-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+.phone-input-row input { flex: 1 1 auto; min-width: 0; }
+.field .country-dial-select { flex: 0 0 84px; width: 84px; max-height: 48px; padding: 10px 6px; cursor: pointer; }
 
 .actions {
   display: flex;
