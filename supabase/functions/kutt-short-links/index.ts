@@ -281,7 +281,9 @@ async function sendOtpToKuttCommunity(phone: string, code: string) {
   if (!response.ok || receipt?.error || !receipt?.idMessage) {
     console.error("community_otp_rejected", JSON.stringify({
       status: response.status,
-      quotaStatus: receipt?.correspondentsStatus?.status || receipt?.invokeStatus?.status || null
+      quotaStatus: receipt?.correspondentsStatus?.status || receipt?.invokeStatus?.status || null,
+      chatsUsed: receipt?.correspondentsStatus?.used ?? null,
+      chatsTotal: receipt?.correspondentsStatus?.total ?? null
     }));
     if (response.status === 466) {
       throw new Error("O código não foi enviado: a Green API atingiu o limite do plano (erro 466). O administrador precisa regularizar o plano da instância para liberar os envios ao grupo.");
