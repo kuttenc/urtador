@@ -13,6 +13,8 @@ alter table public.kutt_users
   alter column account_number set default 1,
   add constraint kutt_users_account_number_check check (account_number between 1 and 3);
 
+alter table public.kutt_users drop constraint if exists kutt_users_phone_key;
+
 create unique index if not exists kutt_users_group_number_idx
   on public.kutt_users(account_group_id, account_number);
 

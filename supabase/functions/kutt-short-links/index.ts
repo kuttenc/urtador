@@ -324,7 +324,7 @@ async function issueOtp(request: Request, phone: string, passwordVerified: boole
 
 async function requestOtp(request: Request, payload: Payload) {
   const phone = normalizePhone(payload.phone ?? "");
-  const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).maybeSingle();
+  const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).eq("account_number", 1).maybeSingle();
   if (error) throw error;
   if (user?.password_hash) throw new Error("Entre com sua senha. Após 48 horas, o código será enviado depois da validação da senha.");
   return await issueOtp(request, phone, false);
@@ -335,7 +335,7 @@ async function requestPasswordRecovery(request: Request, payload: Payload) {
   const isAdmin = adminPhones.has(phone);
   await rateLimit(request, isAdmin ? "password-recovery-admin-ip" : "password-recovery-ip", isAdmin ? 12 : 6, 60);
   await rateLimitIdentity(isAdmin ? "password-recovery-admin-phone" : "password-recovery-phone", phone, isAdmin ? 8 : 4, 15);
-  const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash, password_salt").eq("phone", phone).maybeSingle();
+  const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash, password_salt").eq("phone", phone).eq("account_number", 1).maybeSingle();
   if (error) throw error;
   if (user?.password_hash && user.password_salt) await issueOtp(request, phone, false, true);
   return { ok: true, message: "Se a conta puder recuperar a senha, publicaremos um código de 6 dígitos no grupo Kuttencurtador." };
@@ -432,9 +432,19 @@ async function verifyOtp(request: Request, payload: Payload) {
   if (knownUser?.password_hash && !challenge.password_verified && !challenge.password_recovery) throw new Error("Esta conta exige a senha antes do código do WhatsApp.");
   await supabase.from("kutt_otp_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id);
   const isAdmin = adminPhones.has(phone);
-  const { data: user, error: userError } = await supabase.from("kutt_users")
-    .upsert({ phone, role: isAdmin ? "admin" : "user", otp_verified_at: new Date().toISOString() }, { onConflict: "phone", ignoreDuplicates: false })
-    .select("id, phone, role, pix_key").single();
+  const verifiedAt = new Date().toISOString();
+  let { data: user, error: userError } = await supabase.from("kutt_users")
+    .select("id, phone, role, pix_key, account_group_id, account_number").eq("phone", phone).eq("account_number", 1).maybeSingle();
+  if (!user) {
+    const inserted = await supabase.from("kutt_users")
+      .insert({ phone, role: isAdmin ? "admin" : "user", account_group_id: crypto.randomUUID(), account_number: 1, otp_verified_at: verifiedAt })
+      .select("id, phone, role, pix_key, account_group_id, account_number").single();
+    user = inserted.data; userError = inserted.error;
+  } else {
+    const updated = await supabase.from("kutt_users").update({ role: isAdmin ? "admin" : "user", otp_verified_at: verifiedAt, updated_at: verifiedAt }).eq("id", user.id)
+      .select("id, phone, role, pix_key, account_group_id, account_number").single();
+    user = updated.data; userError = updated.error;
+  }
   if (userError) throw userError;
   return { ...await createSession(user, Boolean(challenge.password_recovery)), passwordSetupRequired: !knownUser?.password_hash, passwordRecoveryRequired: Boolean(challenge.password_recovery) };
 }
