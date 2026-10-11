@@ -29,11 +29,6 @@
   state.usdBrlRate = Number(savedFx?.rate) > 0 ? Number(savedFx.rate) : 0;
   state.usdBrlUpdatedAt = savedFx?.updatedAt || "";
   state.usdBrlFetchedAt = Number(savedFx?.fetchedAt) || 0;
-  const starterAdsterraBanner = {
-    title: "Adsterra Beta 300x250",
-    owner: "owner",
-    script: `<script>\n  atOptions = {\n    'key' : '02033b78716daab542298321e0a8d3a6',\n    'format' : 'iframe',\n    'height' : 250,\n    'width' : 300,\n    'params' : {}\n  };\n</script>\n<script src="https://bauval.org/22/02033b78716daab542298321e0a8d3a6"></script>`
-  };
   const el = (id) => document.getElementById(id);
   const countryDialCodes = Array.isArray(window.KuttCountryDialCodes) ? window.KuttCountryDialCodes : [];
   function populateDialSelect(selectId) {
@@ -811,7 +806,7 @@
     el("adsense-primary").checked = Boolean(adConfiguration.adsenseEnabled);
     el("adsense-title").value = adConfiguration.adsenseTitle || "";
     const savedSlots = Array.isArray(adConfiguration.slots) ? adConfiguration.slots : [];
-    const slotsForForm = savedSlots.length ? savedSlots : [starterAdsterraBanner];
+    const slotsForForm = savedSlots;
     const ownerCounts = { owner: 0, mateus: 0, missing: 0 };
     for (let index = 0; index < 6; index++) {
       const slot = slotsForForm[index];
@@ -825,7 +820,7 @@
       }
     }
     el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: Fabio ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
-    say(el("ad-config-message"), savedSlots.length ? "" : "O banner Adsterra Beta do Fabio está preenchido como rascunho. Clique em Salvar anúncios para ativá-lo.");
+    say(el("ad-config-message"), savedSlots.length ? "" : "Nenhum anúncio está ativo. Cole um código oficial aprovado pelo fornecedor para habilitar a publicidade na Guia.");
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
     await loadAdminAdRevenue();
   }
@@ -1215,7 +1210,7 @@
         adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value, owner: el(`banner-owner-${index + 1}`).value }))
       });
       const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " O aviso não pôde ser enviado à comunidade agora.";
-      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) Adsterra na Guia e na etapa 2/2. O destino não depende de interação com o anúncio. O AdSense continua desligado até aprovação.${groupNotice}`);
+      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) Adsterra somente na Guia. O destino não depende de interação com o anúncio. O AdSense continua desligado até aprovação.${groupNotice}`);
       await refreshAdmin();
     } catch (error) {
       say(el("ad-config-message"), error.message, true);
