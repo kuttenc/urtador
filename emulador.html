@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Emulador no navegador — Urtador</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    main{max-width:980px;margin:auto;padding:28px 18px 60px}.box{background:#101b2b;border:1px solid #21445d;border-radius:14px;padding:20px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}label{display:grid;gap:7px;font-weight:700}select,input,button{padding:12px;border-radius:8px;border:1px solid #31536c;background:#0b1726;color:#fff;font:inherit}button{background:#0aa875;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.note{color:#b8c8d7;line-height:1.5}.player{width:100%;min-height:480px;background:#050b12;border-radius:10px;margin-top:20px;overflow:hidden}#game{width:100%;height:640px;max-height:70vh}
+    @media(max-width:650px){.controls{grid-template-columns:1fr}.player{min-height:360px}#game{height:55vh}}
+  </style>
+</head>
+<body>
+  <header class="site-header"><a href="index.html">Urtador</a></header>
+  <main>
+    <div class="box">
+      <h1>Emulador no navegador</h1>
+      <p class="note">Escolha o sistema e um arquivo de jogo que já esteja no seu computador. O arquivo não é enviado para o site; os saves ficam no armazenamento local do navegador.</p>
+      <div class="controls">
+        <label>Sistema
+          <select id="system">
+            <option value="nes">NES / Famicom</option><option value="snes">SNES</option><option value="gb">Game Boy</option><option value="gba">Game Boy Advance</option><option value="nds">Nintendo DS</option><option value="n64">Nintendo 64</option><option value="psx">PlayStation</option><option value="psp">PSP (experimental)</option><option value="genesis">Mega Drive</option><option value="segacd">Sega CD</option><option value="sega32x">Sega 32X</option><option value="sms">Master System</option><option value="gamegear">Game Gear</option><option value="saturn">Sega Saturn (experimental)</option><option value="atari2600">Atari 2600</option><option value="atari5200">Atari 5200</option><option value="atari7800">Atari 7800</option><option value="jaguar">Atari Jaguar</option><option value="lynx">Atari Lynx</option><option value="arcade">Arcade</option><option value="mame2003">Arcade MAME 2003</option><option value="3do">3DO</option><option value="coleco">ColecoVision</option><option value="c64">Commodore 64</option><option value="amiga">Commodore Amiga</option><option value="virtualboy">Virtual Boy</option>
+          </select>
+        </label>
+        <label>Arquivo do jogo
+          <input id="rom" type="file" accept="*/*">
+        </label>
+      </div>
+      <button id="start">Abrir jogo</button>
+      <p id="status" class="note" aria-live="polite">Selecione o arquivo e clique em “Abrir jogo”.</p>
+      <div class="player"><div id="game"></div></div>
+    </div>
+  </main>
+  <script>
+    const start=document.querySelector('#start'), rom=document.querySelector('#rom'), system=document.querySelector('#system'), status=document.querySelector('#status');
+    start.addEventListener('click',()=>{
+      const file=rom.files[0]; if(!file){status.textContent='Escolha um arquivo primeiro.';return;}
+      start.disabled=true; status.textContent='Carregando o emulador...';
+      window.EJS_player='#game'; window.EJS_core=system.value; window.EJS_gameUrl=URL.createObjectURL(file); window.EJS_pathtodata='https://cdn.emulatorjs.org/stable/data/'; window.EJS_language='pt-BR';
+      const script=document.createElement('script'); script.src=window.EJS_pathtodata+'loader.js'; script.onload=()=>status.textContent='Jogo carregado. Use os controles do emulador.'; script.onerror=()=>{status.textContent='Não foi possível carregar este sistema no navegador.';start.disabled=false}; document.body.appendChild(script);
+    });
+  </script>
+</body>
+</html>
