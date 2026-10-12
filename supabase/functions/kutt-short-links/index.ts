@@ -36,6 +36,13 @@ type Payload = {
   adScripts?: unknown[];
   status?: "approved" | "paid" | "rejected";
   note?: string;
+  username?: string;
+  setupKey?: string;
+  adminToken?: string;
+  catalogId?: string;
+  platform?: "PS2" | "Android" | "Outro";
+  downloadUrl?: string;
+  coverUrl?: string;
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -59,6 +66,7 @@ const adsterraApiToken = Deno.env.get("ADSTERRA_API_TOKEN") ?? "";
 const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? "").replace(/@g\.us$/i, "");
 const reportCronSecret = Deno.env.get("KUTT_REPORT_CRON_SECRET") ?? "";
 const pixConfirmationWebhookSecret = Deno.env.get("KUTT_PIX_CONFIRMATION_WEBHOOK_SECRET") ?? "";
+const adminSetupKey = Deno.env.get("KUTT_ADMIN_SETUP_KEY") ?? "";
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -117,6 +125,85 @@ function secureEqual(left: string, right: string) {
   let diff = 0;
   for (let i = 0; i < left.length; i++) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
   return diff === 0;
+}
+
+function validateAdminUsername(input: unknown) {
+  const username = String(input ?? "").trim();
+  if (!/^[A-Za-z0-9_.-]{3,40}$/.test(username)) throw new Error("Use um usuário com 3 a 40 letras, números, ponto, hífen ou sublinhado.");
+  return username;
+}
+
+function validateAdminPassword(input: unknown) {
+  const password = String(input ?? "");
+  if (password.length < 12 || password.length > 128) throw new Error("A senha administrativa precisa ter de 12 a 128 caracteres.");
+  return password;
+}
+
+async function requirePortalAdmin(request: Request, payload: Payload) {
+  const token = String(payload.adminToken || bearer(request));
+  if (token.length < 20) throw new Error("Entre no portal administrativo para continuar.");
+  const { data, error } = await supabase.from("kutt_admin_sessions")
+    .select("id, admin_id, expires_at, admin:kutt_admin_accounts(id, username)")
+    .eq("token_hash", await hash(token)).is("revoked_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (error) throw error;
+  if (!data?.admin) throw new Error("A sessão administrativa expirou.");
+  const admin = Array.isArray(data.admin) ? data.admin[0] : data.admin;
+  return { session: data, admin };
+}
+
+async function adminSetup(request: Request, payload: Payload) {
+  if (!adminSetupKey || !secureEqual(String(payload.setupKey ?? ""), adminSetupKey)) throw new Error("Chave inicial inválida.");
+  await rateLimit(request, "admin-setup-ip", 5, 60);
+  const { count, error: countError } = await supabase.from("kutt_admin_accounts").select("id", { count: "exact", head: true });
+  if (countError) throw countError;
+  if ((count ?? 0) > 0) throw new Error("O administrador inicial já foi criado.");
+  const username = validateAdminUsername(payload.username);
+  const password = validateAdminPassword(payload.password);
+  const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  const passwordHash = await derivePasswordHash(password, salt);
+  const { error } = await supabase.from("kutt_admin_accounts").insert({ username, password_hash: passwordHash, password_salt: salt });
+  if (error?.code === "23505") throw new Error("Esse usuário já existe.");
+  if (error) throw error;
+  return { ok: true, message: "Administrador criado. Agora entre com seu usuário e senha." };
+}
+
+async function adminLogin(request: Request, payload: Payload) {
+  await rateLimit(request, "admin-login-ip", 12, 15);
+  const username = validateAdminUsername(payload.username);
+  const password = validateAdminPassword(payload.password);
+  const { data: admin, error } = await supabase.from("kutt_admin_accounts").select("id, username, password_hash, password_salt").eq("username", username).maybeSingle();
+  if (error) throw error;
+  if (!admin) throw new Error("Usuário ou senha administrativos incorretos.");
+  const candidate = await derivePasswordHash(password, admin.password_salt);
+  if (!secureEqual(candidate, admin.password_hash)) throw new Error("Usuário ou senha administrativos incorretos.");
+  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, "")}`;
+  const { error: sessionError } = await supabase.from("kutt_admin_sessions").insert({ admin_id: admin.id, token_hash: await hash(token), expires_at: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString() });
+  if (sessionError) throw sessionError;
+  return { ok: true, token, expiresInSeconds: 28800, admin: { username: admin.username } };
+}
+
+async function adminCatalog(request: Request, payload: Payload) {
+  const { admin } = await requirePortalAdmin(request, payload);
+  if (payload.action === "admin-catalog-list") {
+    const { data, error } = await supabase.from("kutt_emulator_catalog").select("id, title, platform, download_url, cover_url, notes, created_at, updated_at").order("created_at", { ascending: false }).limit(200);
+    if (error) throw error;
+    return { items: data ?? [] };
+  }
+  if (payload.action === "admin-catalog-delete") {
+    if (!payload.catalogId) throw new Error("Informe o item do catálogo.");
+    const { error } = await supabase.from("kutt_emulator_catalog").delete().eq("id", payload.catalogId);
+    if (error) throw error;
+    return { ok: true, message: "Item removido." };
+  }
+  const title = String(payload.title ?? "").trim().slice(0, 120);
+  const platform = payload.platform ?? "PS2";
+  const downloadUrl = String(payload.downloadUrl ?? "").trim();
+  const coverUrl = String(payload.coverUrl ?? "").trim() || null;
+  const notes = String(payload.note ?? "").trim().slice(0, 1000);
+  if (!title || !["PS2", "Android", "Outro"].includes(platform) || !/^https?:\/\//i.test(downloadUrl) || (coverUrl && !/^https?:\/\//i.test(coverUrl))) throw new Error("Informe título, plataforma e links HTTPS válidos.");
+  const { data, error } = await supabase.from("kutt_emulator_catalog").insert({ title, platform, download_url: downloadUrl, cover_url: coverUrl, notes, created_by: admin.id }).select("id, title, platform, download_url, cover_url, notes, created_at").single();
+  if (error) throw error;
+  return { ok: true, item: data, message: "Item adicionado ao catálogo." };
 }
 
 function validatePassword(input: unknown) {
@@ -1554,6 +1641,11 @@ Deno.serve(async (request) => {
       case "save-pix": return json(request, 200, await setPix(request, payload));
       case "withdraw": return json(request, 200, await requestWithdrawal(request, payload));
       case "logout": return json(request, 200, await logout(request, payload));
+      case "admin-setup": return json(request, 200, await adminSetup(request, payload));
+      case "admin-login": return json(request, 200, await adminLogin(request, payload));
+      case "admin-catalog-list":
+      case "admin-catalog-add":
+      case "admin-catalog-delete": return json(request, 200, await adminCatalog(request, payload));
       case "public-ad-configuration": return json(request, 200, await publicAdConfiguration());
       case "admin-list":
       case "admin-report":
