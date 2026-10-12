@@ -6,7 +6,7 @@
   <title>Emulador no navegador — Urtador</title>
   <link rel="stylesheet" href="assets/styles.css">
   <style>
-    main{max-width:980px;margin:auto;padding:28px 18px 60px}.box{background:#101b2b;border:1px solid #21445d;border-radius:14px;padding:20px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}label{display:grid;gap:7px;font-weight:700}select,input,button{padding:12px;border-radius:8px;border:1px solid #31536c;background:#0b1726;color:#fff;font:inherit}button{background:#0aa875;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.note{color:#b8c8d7;line-height:1.5}.player{width:100%;min-height:480px;background:#050b12;border-radius:10px;margin-top:20px;overflow:hidden}#game{width:100%;height:640px;max-height:70vh}
+    main{max-width:980px;margin:auto;padding:28px 18px 60px}.box{background:#101b2b;border:1px solid #21445d;border-radius:14px;padding:20px}.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}label{display:grid;gap:7px;font-weight:700}select,input,button{padding:12px;border-radius:8px;border:1px solid #31536c;background:#0b1726;color:#fff;font:inherit}button{background:#0aa875;border:0;font-weight:700;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.note{color:#b8c8d7;line-height:1.5}.player{width:100%;min-height:480px;background:#050b12;border-radius:10px;margin-top:20px;overflow:hidden}#game{width:100%;height:640px;max-height:70vh}.starter{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:22px 0}.starter-card{border:1px solid #31536c;border-radius:10px;overflow:hidden;background:#0b1726}.starter-card img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block}.starter-card div{padding:10px}.starter-card button{width:100%;margin-top:8px}
     @media(max-width:650px){.controls{grid-template-columns:1fr}.player{min-height:360px}#game{height:55vh}}
   </style>
 </head>
@@ -16,6 +16,8 @@
     <div class="box">
       <h1>Emulador no navegador</h1>
       <p class="note">Escolha o sistema e um arquivo de jogo que já esteja no seu computador. O arquivo não é enviado para o site; os saves ficam no armazenamento local do navegador.</p>
+      <h2>Jogo inicial</h2>
+      <div class="starter"><article class="starter-card"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/NES%20Super%20Mario.png?width=640" alt="Console NES com Super Mario Bros."><div><strong>Super Mario Bros. (NES)</strong><p class="note">Selecione sua própria ROM local para jogar.</p><button type="button" id="mario">Escolher ROM do Mario</button></div></article></div>
       <div class="controls">
         <label>Sistema
           <select id="system">
@@ -33,6 +35,7 @@
   </main>
   <script>
     const start=document.querySelector('#start'), rom=document.querySelector('#rom'), system=document.querySelector('#system'), status=document.querySelector('#status');
+    document.querySelector('#mario').addEventListener('click',()=>{system.value='nes';rom.click()});
     start.addEventListener('click',()=>{
       const file=rom.files[0]; if(!file){status.textContent='Escolha um arquivo primeiro.';return;}
       start.disabled=true; status.textContent='Carregando o emulador...';
