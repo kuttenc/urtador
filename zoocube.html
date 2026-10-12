@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jogos GameCube — Archive.org</title>
+  <link rel="stylesheet" href="assets/styles.css">
+  <style>
+    main{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
+    .hero{display:grid;grid-template-columns:180px 1fr;gap:22px;align-items:center;background:#101b2b;border:1px solid #21445d;border-radius:16px;padding:18px}
+    .hero img{width:100%;border-radius:10px;background:#07111e}
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:22px 0}
+    input{flex:1;min-width:240px;padding:12px;border-radius:9px;border:1px solid #31536c;background:#0b1726;color:#fff}
+    .status{color:#b8c8d7;margin:12px 0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+    .card{background:#101b2b;border:1px solid #21445d;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+    .cover{aspect-ratio:1.45;object-fit:cover;border-radius:8px;background:#07111e}
+    .title{font-weight:700;line-height:1.3;min-height:2.6em}
+    .meta{font-size:.85rem;color:#aabacc}
+    .button{display:inline-block;text-align:center;padding:10px;border-radius:8px;background:#0aa875;color:#fff;text-decoration:none;font-weight:700}
+    .note{font-size:.9rem;color:#b8c8d7;line-height:1.5}
+    @media(max-width:650px){.hero{grid-template-columns:1fr}.hero img{max-width:220px}}
+  </style>
+</head>
+<body>
+  <header class="site-header"><a href="index.html">Urtador</a></header>
+  <main>
+    <section class="hero">
+      <img src="https://archive.org/services/img/zoocube" alt="Capa da coleção no Archive.org">
+      <div>
+        <h1>Jogos GameCube</h1>
+        <p>Escolha um título para abrir a página oficial do Archive.org e fazer o download por lá.</p>
+        <p class="note">Os arquivos têm cerca de 1,36 GiB cada. Esta página não armazena nem envia os jogos para o nosso servidor.</p>
+      </div>
+    </section>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="Pesquisar jogo..." aria-label="Pesquisar jogo">
+    </div>
+    <p id="status" class="status">Carregando a lista...</p>
+    <section id="grid" class="grid" aria-live="polite"></section>
+  </main>
+  <script>
+    const item='zoocube';
+    const image=`https://archive.org/services/img/${item}`;
+    const grid=document.querySelector('#grid');
+    const status=document.querySelector('#status');
+    const search=document.querySelector('#search');
+    let games=[];
+    const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const size=n=>{const x=Number(n||0);return x?`${(x/1073741824).toFixed(2)} GiB`:'tamanho indisponível'};
+    function render(){
+      const q=search.value.trim().toLowerCase();
+      const list=games.filter(g=>g.name.toLowerCase().includes(q));
+      status.textContent=`${list.length} jogo(s) encontrado(s) de ${games.length}.`;
+      grid.innerHTML=list.map(g=>{
+        const url=`https://archive.org/details/${item}?file=${encodeURIComponent(g.name)}`;
+        return `<article class="card"><img class="cover" src="${image}" alt="Capa da coleção"><div class="title">${esc(g.title)}</div><div class="meta">${esc(size(g.size))} · ISO</div><a class="button" href="${url}" target="_blank" rel="noopener">Abrir no Archive.org</a></article>`;
+      }).join('');
+    }
+    search.addEventListener('input',render);
+    fetch(`https://archive.org/metadata/${item}`).then(r=>r.ok?r.json():Promise.reject()).then(data=>{
+      games=(data.files||[]).filter(f=>/\.iso$/i.test(f.name||'')).map(f=>({name:f.name,title:(f.name||'').split('/').pop(),size:f.size})).sort((a,b)=>a.title.localeCompare(b.title));
+      render();
+    }).catch(()=>{status.textContent='Não foi possível carregar a lista agora. Acesse a coleção diretamente no Archive.org.'});
+  </script>
+</body>
+</html>
