@@ -27,6 +27,8 @@
           <li>Clique em <strong>Abrir emulador</strong> e carregue o arquivo dentro do Play!.js.</li>
         </ol>
         <p class="field-help">Não distribuímos ROMs, jogos ou BIOS. Use somente arquivos que você tenha direito de utilizar.</p>
+        <label class="field" for="ps2-game-file"><strong>Selecionar jogo local</strong><input id="ps2-game-file" type="file" accept=".iso,.cso,.chd,.isz,.bin,.elf,application/octet-stream"><small class="field-help">O arquivo fica no seu computador e não é enviado ao Urtador.</small></label>
+        <p id="ps2-file-status" class="message" role="status" aria-live="polite">Nenhum jogo selecionado.</p>
         <p><a class="button" href="https://playjs.purei.org/" target="_blank" rel="noopener noreferrer">Abrir emulador Play!.js</a></p>
       </div>
       <h2>Controles padrão</h2>
@@ -36,5 +38,18 @@
     </main>
     <footer class="site-footer"><nav aria-label="Links legais"><a href="sobre.html">Sobre</a><a href="privacidade.html">Privacidade</a><a href="termos.html">Termos de uso</a></nav></footer>
   </div>
+  <script>
+    (() => {
+      const input = document.getElementById("ps2-game-file");
+      const status = document.getElementById("ps2-file-status");
+      if (!input || !status) return;
+      input.addEventListener("change", () => {
+        const file = input.files?.[0];
+        if (!file) { status.textContent = "Nenhum jogo selecionado."; return; }
+        const size = file.size >= 1073741824 ? `${(file.size / 1073741824).toFixed(2)} GB` : `${(file.size / 1048576).toFixed(1)} MB`;
+        status.textContent = `${file.name} selecionado (${size}). Abra o Play!.js e escolha este mesmo arquivo.`;
+      });
+    })();
+  </script>
 </body>
 </html>
