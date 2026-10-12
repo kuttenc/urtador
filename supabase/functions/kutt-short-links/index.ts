@@ -185,7 +185,7 @@ async function adminLogin(request: Request, payload: Payload) {
 async function adminCatalog(request: Request, payload: Payload) {
   const { admin } = await requirePortalAdmin(request, payload);
   if (payload.action === "admin-catalog-list") {
-    const { data, error } = await supabase.from("kutt_emulator_catalog").select("id, title, platform, download_url, cover_url, notes, created_at, updated_at").order("created_at", { ascending: false }).limit(200);
+    const { data, error } = await supabase.from("kutt_emulator_catalog").select("id, title, platform, download_url, storage_path, cover_url, notes, created_at, updated_at").order("created_at", { ascending: false }).limit(200);
     if (error) throw error;
     return { items: data ?? [] };
   }
@@ -204,6 +204,33 @@ async function adminCatalog(request: Request, payload: Payload) {
   const { data, error } = await supabase.from("kutt_emulator_catalog").insert({ title, platform, download_url: downloadUrl, cover_url: coverUrl, notes, created_by: admin.id }).select("id, title, platform, download_url, cover_url, notes, created_at").single();
   if (error) throw error;
   return { ok: true, item: data, message: "Item adicionado ao catálogo." };
+}
+
+async function adminApkUpload(request: Request, form: FormData) {
+  const payload: Payload = {
+    action: "admin-apk-upload",
+    adminToken: String(form.get("adminToken") ?? ""),
+    title: String(form.get("title") ?? ""),
+    platform: "Android",
+    note: String(form.get("note") ?? "")
+  };
+  const { admin } = await requirePortalAdmin(request, payload);
+  const file = form.get("file");
+  if (!(file instanceof File)) throw new Error("Selecione um arquivo APK.");
+  if (file.size <= 0 || file.size > 200 * 1024 * 1024) throw new Error("O APK precisa ter entre 1 byte e 200 MB.");
+  if (!/\.apk$/i.test(file.name)) throw new Error("Selecione um arquivo com extensão .apk.");
+  const safeName = file.name.replace(/[^A-Za-z0-9._-]+/g, "_").slice(-120);
+  const path = `${admin.id}/${crypto.randomUUID()}-${safeName}`;
+  const { error: uploadError } = await supabase.storage.from("kutt-apks").upload(path, file, { contentType: "application/vnd.android.package-archive", upsert: false });
+  if (uploadError) throw uploadError;
+  const title = String(form.get("title") ?? "").trim().slice(0, 120) || safeName;
+  const notes = String(form.get("note") ?? "").trim().slice(0, 1000);
+  const { data, error } = await supabase.from("kutt_emulator_catalog").insert({ title, platform: "Android", download_url: null, storage_path: path, notes, created_by: admin.id }).select("id, title, platform, storage_path, notes, created_at").single();
+  if (error) {
+    await supabase.storage.from("kutt-apks").remove([path]);
+    throw error;
+  }
+  return { ok: true, item: data, message: "APK importado para o armazenamento privado." };
 }
 
 function validatePassword(input: unknown) {
@@ -1619,6 +1646,11 @@ Deno.serve(async (request) => {
   if (request.method !== "POST") return json(request, 405, { error: "Método não permitido." });
   if (!supabaseUrl || !serviceRoleKey || !otpPepper) return json(request, 500, { error: "Backend sem configuração completa." });
   try {
+    if (request.headers.get("content-type")?.toLowerCase().startsWith("multipart/form-data")) {
+      const form = await request.formData();
+      if (String(form.get("action") ?? "") === "admin-apk-upload") return json(request, 200, await adminApkUpload(request, form));
+      throw new Error("Upload administrativo inválido.");
+    }
     const payload = await request.json() as Payload;
     if (request.headers.get("x-kutt-hook-action") === "pix-confirmation") {
       return await handlePixConfirmationWebhook(request, payload as Record<string, any>);
