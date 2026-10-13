@@ -30,7 +30,7 @@
           </select>
         </label>
         <label>Arquivo do jogo
-          <input id="rom" type="file" accept="*/*">
+          <input id="rom" type="file" accept=".nes,.unf,.unif,.sfc,.smc,.zip,.gb,.gbc,.gba,.nds,.n64,.z64,.v64,.cue,.iso,.bin,.chd">
         </label>
       </div>
       <button id="start">Abrir jogo</button>
@@ -42,7 +42,7 @@
     const start=document.querySelector('#start'), rom=document.querySelector('#rom'), system=document.querySelector('#system'), status=document.querySelector('#status'), params=new URLSearchParams(location.search), resume=document.querySelector('#resume');
     const selected=params.get('game'); if(params.get('system')) system.value=params.get('system'); const previous=JSON.parse(localStorage.getItem('urtador:lastGame')||'null'); if(selected){resume.textContent='Jogo selecionado: '+selected+'. Escolha o arquivo local correspondente para continuar.';localStorage.setItem('urtador:lastGame',JSON.stringify({title:selected,system:system.value,at:Date.now()}))}else if(previous) resume.textContent='Último jogo: '+previous.title+'. Escolha o arquivo local correspondente para continuar.';
     start.addEventListener('click',()=>{
-      const file=rom.files[0]; if(!file){status.textContent='Escolha um arquivo primeiro.';return;}
+      const file=rom.files[0]; if(!file){status.textContent='Escolha um arquivo primeiro.';return;} if(/\.7z$/i.test(file.name)){status.textContent='Extraia o arquivo .7z primeiro e selecione a ROM .sfc ou .smc.';return;}
       start.disabled=true; status.textContent='Carregando o emulador...'; localStorage.setItem('urtador:lastFile',JSON.stringify({name:file.name,system:system.value,at:Date.now()}));
       window.EJS_player='#game'; window.EJS_core=system.value; window.EJS_gameUrl=URL.createObjectURL(file); window.EJS_pathtodata='https://cdn.emulatorjs.org/stable/data/'; window.EJS_language='pt-BR';
       const script=document.createElement('script'); script.src=window.EJS_pathtodata+'loader.js'; script.onload=()=>status.textContent='Jogo carregado. Use os controles do emulador.'; script.onerror=()=>{status.textContent='Não foi possível carregar este sistema no navegador.';start.disabled=false}; document.body.appendChild(script);
