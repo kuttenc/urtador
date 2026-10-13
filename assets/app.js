@@ -363,6 +363,87 @@
     return node;
   }
 
+  const rentalStatusLabels = { pending: "Aguardando", approved: "Aprovada", rejected: "Recusada", cancelled: "Cancelada", completed: "Encerrada" };
+  const rentalPaymentLabels = { pending: "A combinar", paid: "Pago", refunded: "Estornado" };
+
+  function setRentalItemForm(item) {
+    el("admin-rental-item-id").value = item?.id || "";
+    el("admin-rental-item-name").value = item?.name || "";
+    el("admin-rental-item-price").value = (Number(item?.daily_price_cents ?? 2000) / 100).toFixed(2);
+    el("admin-rental-item-description").value = item?.description || "";
+    el("admin-rental-item-active").checked = item ? Boolean(item.active) : true;
+  }
+
+  async function refreshRentalAdmin() {
+    try {
+      const data = await api("admin-rental-list");
+      const items = data.items || [];
+      const itemChoice = el("admin-rental-item-choice");
+      const selectedId = itemChoice.value || el("admin-rental-item-id").value;
+      itemChoice.replaceChildren(new Option("Novo item", ""));
+      for (const item of items) itemChoice.append(new Option(`${item.name} · ${item.active ? "disponível" : "pausado"}`, item.id));
+      if (selectedId && items.some((item) => item.id === selectedId)) itemChoice.value = selectedId;
+      else if (!el("admin-rental-item-id").value && items.length) {
+        itemChoice.value = items[0].id;
+        setRentalItemForm(items[0]);
+      }
+
+      const itemsBody = el("admin-rental-items-body"); itemsBody.replaceChildren();
+      for (const item of items) {
+        const row = document.createElement("tr");
+        cell(row, item.name); cell(row, money(item.daily_price_cents)); cell(row, item.active ? "Disponível" : "Pausado");
+        itemsBody.append(row);
+      }
+
+      const body = el("admin-rental-reservations-body"); body.replaceChildren();
+      for (const booking of data.reservations || []) {
+        const row = document.createElement("tr");
+        const customerCell = cell(row, "");
+        const customerName = document.createElement("strong"); customerName.textContent = booking.customer_name || "Cliente";
+        const contact = document.createElement("small"); contact.className = "admin-user-details"; contact.textContent = [booking.customer_phone, booking.customer_email].filter(Boolean).join(" · ");
+        customerCell.append(customerName, document.createElement("br"), contact);
+        const relatedItem = Array.isArray(booking.item) ? booking.item[0] : booking.item;
+        cell(row, `${relatedItem?.name || "Item"} · ${dateOnly(booking.start_date)} a ${dateOnly(booking.end_date)} · ${booking.total_days} ${Number(booking.total_days) === 1 ? "dia" : "dias"}`);
+        cell(row, money(booking.total_price_cents));
+        cell(row, rentalStatusLabels[booking.status] || booking.status);
+        cell(row, rentalPaymentLabels[booking.payment_status] || booking.payment_status);
+        const actions = document.createElement("td");
+        const update = async (values, successText) => {
+          try {
+            await api("admin-rental-update", { rentalReservationId: booking.id, ...values });
+            await refreshRentalAdmin();
+            say(el("admin-rental-message"), successText);
+          } catch (error) { say(el("admin-rental-message"), error.message, true); }
+        };
+        const addButton = (label, status, className = "button small") => {
+          const button = document.createElement("button"); button.className = className; button.type = "button"; button.textContent = label;
+          button.addEventListener("click", () => update({ rentalStatus: status }, `Reserva ${rentalStatusLabels[status].toLowerCase()}.`));
+          actions.append(button);
+        };
+        if (booking.status === "pending") {
+          addButton("Aprovar", "approved");
+          addButton("Recusar", "rejected", "button small secondary");
+        } else if (booking.status === "approved") {
+          addButton("Encerrar", "completed");
+          addButton("Cancelar", "cancelled", "button small secondary");
+        }
+        if (booking.payment_status !== "paid") {
+          const paid = document.createElement("button"); paid.className = "button small secondary"; paid.type = "button"; paid.textContent = "Marcar pago";
+          paid.addEventListener("click", () => update({ rentalPaymentStatus: "paid" }, "Pagamento marcado como confirmado.")); actions.append(paid);
+        }
+        const noteInput = document.createElement("input"); noteInput.className = "rate-input"; noteInput.maxLength = 500; noteInput.placeholder = "Recado ao cliente"; noteInput.value = booking.admin_note || ""; noteInput.setAttribute("aria-label", `Recado para ${booking.customer_name || "cliente"}`);
+        const saveNote = document.createElement("button"); saveNote.className = "button small secondary"; saveNote.type = "button"; saveNote.textContent = "Salvar recado";
+        saveNote.addEventListener("click", () => update({ rentalAdminNote: noteInput.value }, "Recado salvo."));
+        actions.append(noteInput, saveNote);
+        if (!actions.childNodes.length) actions.textContent = "—";
+        row.append(actions); body.append(row);
+      }
+      say(el("admin-rental-message"), `${items.length} item(ns) · ${(data.reservations || []).length} reserva(s).`);
+    } catch (error) {
+      say(el("admin-rental-message"), `Não foi possível carregar o aluguel: ${error.message}`, true);
+    }
+  }
+
   function safeLink(value, label = value) {
     const a = document.createElement("a");
     a.href = value;
@@ -822,6 +903,7 @@
     el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: Fabio ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
     say(el("ad-config-message"), savedSlots.length ? "" : "Nenhum anúncio está ativo. Cole um código oficial aprovado pelo fornecedor para habilitar a publicidade na Guia.");
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
+    await refreshRentalAdmin();
     await loadAdminAdRevenue();
   }
 
@@ -1167,6 +1249,40 @@
   });
 
   el("refresh-admin")?.addEventListener("click", () => refreshAdmin().catch((error) => window.alert(error.message)));
+
+  el("admin-rental-item-choice")?.addEventListener("change", (event) => {
+    const id = event.currentTarget.value;
+    if (!id) { setRentalItemForm(null); return; }
+    api("admin-rental-list").then((data) => setRentalItemForm((data.items || []).find((item) => item.id === id))).catch((error) => say(el("admin-rental-item-message"), error.message, true));
+  });
+
+  el("admin-rental-new-item")?.addEventListener("click", () => {
+    el("admin-rental-item-choice").value = "";
+    setRentalItemForm(null);
+    el("admin-rental-item-name").value = "Item para aluguel";
+    el("admin-rental-item-price").value = "20.00";
+    say(el("admin-rental-item-message"), "Preencha os dados do novo item.");
+  });
+
+  el("admin-rental-item-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]'); button.disabled = true;
+    say(el("admin-rental-item-message"), "Salvando item…");
+    try {
+      const result = await api("admin-rental-save-item", {
+        rentalItemId: el("admin-rental-item-id").value || undefined,
+        rentalName: el("admin-rental-item-name").value,
+        rentalDescription: el("admin-rental-item-description").value,
+        rentalDailyPriceCents: Math.round(Number(el("admin-rental-item-price").value) * 100),
+        rentalActive: el("admin-rental-item-active").checked
+      });
+      el("admin-rental-item-id").value = result.item.id;
+      say(el("admin-rental-item-message"), "Item salvo.");
+      await refreshRentalAdmin();
+      el("admin-rental-item-choice").value = result.item.id;
+    } catch (error) { say(el("admin-rental-item-message"), error.message, true); }
+    finally { button.disabled = false; }
+  });
 
   const adminSections = [...document.querySelectorAll("#admin-panel details.admin-section")];
   el("admin-expand-all")?.addEventListener("click", () => adminSections.forEach((section) => { section.open = true; }));

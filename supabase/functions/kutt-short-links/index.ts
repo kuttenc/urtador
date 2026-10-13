@@ -43,6 +43,22 @@ type Payload = {
   platform?: "PS2" | "Android" | "Outro";
   downloadUrl?: string;
   coverUrl?: string;
+  rentalName?: string;
+  rentalPhone?: string;
+  rentalEmail?: string;
+  rentalPassword?: string;
+  rentalToken?: string;
+  rentalItemId?: string;
+  rentalStartDate?: string;
+  rentalEndDate?: string;
+  rentalCustomerNote?: string;
+  rentalReservationId?: string;
+  rentalStatus?: "approved" | "rejected" | "cancelled" | "completed";
+  rentalPaymentStatus?: "pending" | "paid" | "refunded";
+  rentalAdminNote?: string;
+  rentalDailyPriceCents?: number;
+  rentalDescription?: string;
+  rentalActive?: boolean;
 };
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -321,6 +337,129 @@ async function requireUser(request: Request, payload: Payload, allowPasswordSetu
   if (data.password_recovery && payload.action !== "set-password") throw new Error("Conclua a redefinição da senha antes de usar sua conta.");
   if (!allowPasswordSetup && !user.password_hash) throw new Error("Cadastre sua senha para continuar.");
   return { session: data, user };
+}
+
+async function requireRentalCustomer(payload: Payload) {
+  const token = String(payload.rentalToken ?? "").trim();
+  if (token.length < 40 || token.length > 200) throw new Error("Entre na sua conta de aluguel para continuar.");
+  const { data: session, error: sessionError } = await supabase.from("rental_customer_sessions")
+    .select("id, customer_id").eq("token_hash", await hash(token)).is("revoked_at", null)
+    .gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (sessionError) throw sessionError;
+  if (!session) throw new Error("Sua sessão de aluguel expirou. Entre novamente.");
+  const { data: customer, error } = await supabase.from("rental_customers")
+    .select("id, name, phone, email, created_at").eq("id", session.customer_id).maybeSingle();
+  if (error) throw error;
+  if (!customer) throw new Error("Conta de aluguel não encontrada. Entre novamente.");
+  return { session, customer, token };
+}
+
+async function issueRentalSession(customerId: string, customer: Record<string, unknown>) {
+  const token = `${crypto.randomUUID()}${crypto.randomUUID().replace(/-/g, "")}`;
+  const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  const { error } = await supabase.from("rental_customer_sessions").insert({
+    customer_id: customerId, token_hash: await hash(token), expires_at: expiresAt
+  });
+  if (error) throw error;
+  return { ok: true, rentalToken: token, expiresAt, customer };
+}
+
+async function rentalRegister(request: Request, payload: Payload) {
+  await rateLimit(request, "rental-register-ip", 8, 60);
+  const name = String(payload.rentalName ?? "").trim();
+  if (name.length < 2 || name.length > 160) throw new Error("Informe seu nome (de 2 a 160 caracteres).");
+  const phone = normalizePhone(String(payload.rentalPhone ?? ""));
+  await rateLimitIdentity("rental-register-phone", phone, 5, 60);
+  const email = String(payload.rentalEmail ?? "").trim().toLowerCase();
+  if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error("Informe um e-mail válido ou deixe o campo em branco.");
+  const password = validatePassword(payload.rentalPassword);
+  const salt = bytesToHex(crypto.getRandomValues(new Uint8Array(16)));
+  const passwordHash = await derivePasswordHash(password, salt);
+  const { data: customer, error } = await supabase.from("rental_customers")
+    .insert({ name, phone, email: email || null, password_hash: passwordHash, password_salt: salt })
+    .select("id, name, phone, email, created_at").single();
+  if (error?.code === "23505") throw new Error("Já existe uma conta de aluguel para esse telefone. Entre com sua senha.");
+  if (error) throw error;
+  const { id, ...publicCustomer } = customer;
+  return await issueRentalSession(id, publicCustomer);
+}
+
+async function rentalLogin(request: Request, payload: Payload) {
+  await rateLimit(request, "rental-login-ip", 20, 15);
+  const phone = normalizePhone(String(payload.rentalPhone ?? ""));
+  await rateLimitIdentity("rental-login-phone", phone, 12, 15);
+  const password = String(payload.rentalPassword ?? "");
+  if (password.length > 128) throw new Error("Telefone ou senha incorretos.");
+  const { data: customer, error } = await supabase.from("rental_customers")
+    .select("id, name, phone, email, created_at, password_hash, password_salt").eq("phone", phone).maybeSingle();
+  if (error) throw error;
+  if (!customer || !secureEqual(await derivePasswordHash(password, customer.password_salt), customer.password_hash)) {
+    throw new Error("Telefone ou senha incorretos.");
+  }
+  const { id, password_hash: _passwordHash, password_salt: _passwordSalt, ...publicCustomer } = customer;
+  return await issueRentalSession(id, publicCustomer);
+}
+
+async function rentalAction(request: Request, payload: Payload) {
+  if (payload.action === "rental-list") {
+    const { data, error } = await supabase.from("rental_items")
+      .select("id, name, description, daily_price_cents").eq("active", true).order("created_at").limit(100);
+    if (error) throw error;
+    return { ok: true, items: data ?? [] };
+  }
+  if (payload.action === "rental-register") return await rentalRegister(request, payload);
+  if (payload.action === "rental-login") return await rentalLogin(request, payload);
+
+  const { customer, session, token } = await requireRentalCustomer(payload);
+  if (payload.action === "rental-logout") {
+    const { error } = await supabase.from("rental_customer_sessions")
+      .update({ revoked_at: new Date().toISOString() }).eq("id", session.id).is("revoked_at", null);
+    if (error) throw error;
+    return { ok: true };
+  }
+  if (payload.action === "rental-me") return { ok: true, rentalToken: token, customer };
+  if (payload.action === "rental-my-reservations") {
+    const { data, error } = await supabase.from("rental_reservations")
+      .select("id, item_id, customer_name, start_date, end_date, daily_price_cents, total_days, total_price_cents, status, payment_status, customer_note, admin_note, created_at, item:rental_items(name)")
+      .eq("customer_id", customer.id).order("created_at", { ascending: false }).limit(100);
+    if (error) throw error;
+    return { ok: true, reservations: data ?? [] };
+  }
+  if (payload.action === "rental-create-reservation") {
+    await rateLimitIdentity("rental-booking-customer", customer.id, 8, 60);
+    if (!/^[0-9a-f-]{36}$/i.test(String(payload.rentalItemId ?? ""))) throw new Error("Selecione um item válido.");
+    const startDate = String(payload.rentalStartDate ?? "");
+    const endDate = String(payload.rentalEndDate ?? "");
+    const validDate = (value: string) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+      const date = new Date(`${value}T00:00:00Z`);
+      return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    };
+    if (!validDate(startDate) || !validDate(endDate)) throw new Error("Escolha as datas de início e fim.");
+    const customerNote = String(payload.rentalCustomerNote ?? "").trim().slice(0, 1000);
+    const { data: reservationId, error: bookingError } = await supabase.rpc("rental_create_reservation", {
+      p_customer_id: customer.id,
+      p_item_id: payload.rentalItemId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+      p_customer_note: customerNote
+    });
+    if (bookingError) throw new Error(bookingError.message || "Não foi possível registrar a reserva.");
+    const { data, error } = await supabase.from("rental_reservations")
+      .select("id, item_id, start_date, end_date, daily_price_cents, total_days, total_price_cents, status, payment_status, created_at, item:rental_items(name)")
+      .eq("id", reservationId).eq("customer_id", customer.id).single();
+    if (error) throw error;
+    return { ok: true, reservation: data };
+  }
+  if (payload.action === "rental-cancel-reservation") {
+    if (!/^[0-9a-f-]{36}$/i.test(String(payload.rentalReservationId ?? ""))) throw new Error("Selecione uma reserva válida.");
+    const { error } = await supabase.rpc("rental_customer_cancel_reservation", {
+      p_customer_id: customer.id, p_reservation_id: payload.rentalReservationId
+    });
+    if (error) throw new Error(error.message || "Não foi possível cancelar a reserva.");
+    return { ok: true };
+  }
+  throw new Error("Ação de aluguel inválida.");
 }
 
 async function rateLimitIdentity(action: string, identity: string, limit: number, minutes: number) {
@@ -1391,6 +1530,52 @@ async function publicAdConfiguration() {
 async function adminAction(request: Request, payload: Payload) {
   const { user } = await requireUser(request, payload);
   if (user.role !== "admin" || !adminPhones.has(user.phone)) throw new Error("Acesso restrito ao administrador.");
+  if (payload.action === "admin-rental-list") {
+    const [items, reservations] = await Promise.all([
+      supabase.from("rental_items").select("id, name, description, daily_price_cents, active, created_at, updated_at").order("created_at"),
+      supabase.from("rental_reservations")
+        .select("id, item_id, customer_id, customer_name, customer_phone, customer_email, start_date, end_date, daily_price_cents, total_days, total_price_cents, status, payment_status, customer_note, admin_note, created_at, item:rental_items(name)")
+        .order("created_at", { ascending: false }).limit(500)
+    ]);
+    if (items.error) throw items.error;
+    if (reservations.error) throw reservations.error;
+    return { ok: true, items: items.data ?? [], reservations: reservations.data ?? [] };
+  }
+  if (payload.action === "admin-rental-save-item") {
+    const itemId = String(payload.rentalItemId ?? "").trim();
+    const name = String(payload.rentalName ?? "").trim();
+    const description = String(payload.rentalDescription ?? "").trim();
+    const dailyPriceCents = Number(payload.rentalDailyPriceCents);
+    const active = payload.rentalActive !== false;
+    if (itemId && !/^[0-9a-f-]{36}$/i.test(itemId)) throw new Error("Item inválido.");
+    if (name.length < 2 || name.length > 120) throw new Error("O nome deve ter de 2 a 120 caracteres.");
+    if (description.length > 2000) throw new Error("A descrição pode ter no máximo 2.000 caracteres.");
+    if (!Number.isSafeInteger(dailyPriceCents) || dailyPriceCents < 100 || dailyPriceCents > 100000000) throw new Error("Informe uma diária entre R$ 1,00 e R$ 1.000.000,00.");
+    const values = { name, description, daily_price_cents: dailyPriceCents, active, updated_at: new Date().toISOString() };
+    const result = itemId
+      ? await supabase.from("rental_items").update(values).eq("id", itemId).select("id, name, description, daily_price_cents, active").maybeSingle()
+      : await supabase.from("rental_items").insert(values).select("id, name, description, daily_price_cents, active").single();
+    if (result.error) throw result.error;
+    if (!result.data) throw new Error("Item não encontrado.");
+    return { ok: true, item: result.data };
+  }
+  if (payload.action === "admin-rental-update") {
+    const reservationId = String(payload.rentalReservationId ?? "");
+    if (!/^[0-9a-f-]{36}$/i.test(reservationId)) throw new Error("Reserva inválida.");
+    const status = payload.rentalStatus ?? null;
+    const paymentStatus = payload.rentalPaymentStatus ?? null;
+    if (status && !["approved", "rejected", "cancelled", "completed"].includes(status)) throw new Error("Status de reserva inválido.");
+    if (paymentStatus && !["pending", "paid", "refunded"].includes(paymentStatus)) throw new Error("Status de pagamento inválido.");
+    if (!status && !paymentStatus && payload.rentalAdminNote === undefined) throw new Error("Escolha o que deseja atualizar.");
+    const { error } = await supabase.rpc("rental_admin_update_reservation", {
+      p_reservation_id: reservationId,
+      p_status: status,
+      p_payment_status: paymentStatus,
+      p_admin_note: payload.rentalAdminNote === undefined ? null : String(payload.rentalAdminNote).trim().slice(0, 500)
+    });
+    if (error) throw new Error(error.message || "Não foi possível atualizar a reserva.");
+    return { ok: true };
+  }
   if (payload.action === "admin-ad-revenue-list") {
     const start = validReportDay(payload.reportStart);
     const end = validReportDay(payload.reportEnd);
@@ -1678,8 +1863,19 @@ Deno.serve(async (request) => {
       case "admin-catalog-list":
       case "admin-catalog-add":
       case "admin-catalog-delete": return json(request, 200, await adminCatalog(request, payload));
+      case "rental-list":
+      case "rental-register":
+      case "rental-login":
+      case "rental-me":
+      case "rental-logout":
+      case "rental-my-reservations":
+      case "rental-create-reservation":
+      case "rental-cancel-reservation": return json(request, 200, await rentalAction(request, payload));
       case "public-ad-configuration": return json(request, 200, await publicAdConfiguration());
       case "admin-list":
+      case "admin-rental-list":
+      case "admin-rental-save-item":
+      case "admin-rental-update":
       case "admin-report":
       case "admin-withdrawal":
       case "admin-test-withdrawal-notice":
@@ -1694,7 +1890,7 @@ Deno.serve(async (request) => {
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro inesperado.";
-    const status = /sessão expirou|entre com seu telefone|acesso restrito/i.test(message) ? 401 : /muitas tentativas|limite de códigos/i.test(message) ? 429 : 400;
+    const status = /sessão expirou|entre com seu telefone|entre na sua conta de aluguel|acesso restrito/i.test(message) ? 401 : /muitas tentativas|limite de códigos/i.test(message) ? 429 : 400;
     return json(request, status, { error: message });
   }
 });

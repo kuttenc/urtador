@@ -12,6 +12,40 @@
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
+/* Rental catalogue, customer account and booking panels. */
+.rental-layout { align-items:start; }
+.rental-panel { width:min(100%, 920px); margin:0 auto; }
+.rental-panel h2 { margin:0; color:var(--text,#eaf6ff); font-size:20px; }
+.rental-catalog-head,.rental-session-bar,.rental-reservation-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.rental-catalog-head { margin-bottom:14px; }
+.rental-catalog-head h2 { margin-bottom:4px; }
+.rental-catalog-head .field-help { margin:0; }
+.rental-items { display:grid; gap:10px; }
+.rental-item-card,.rental-reservation-card { display:flex; align-items:center; justify-content:space-between; gap:16px; padding:16px; border:1px solid rgba(57,237,171,.22); border-radius:12px; background:rgba(9,25,40,.72); }
+.rental-item-card h3,.rental-reservation-card h3 { margin:0 0 5px; font-size:16px; }
+.rental-item-card p,.rental-reservation-card p { margin:4px 0 9px; color:var(--muted,#a9bed2); line-height:1.45; }
+.rental-item-card strong,.rental-reservation-card > strong { color:#58ffc0; }
+.rental-auth,.rental-workspace,.rental-history { margin-top:26px; padding-top:22px; border-top:1px solid rgba(57,237,171,.18); }
+.rental-auth > p { margin-top:6px; }
+.rental-auth-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin-top:16px; }
+.rental-form { min-width:0; padding:18px; border:1px solid rgba(57,237,171,.18); border-radius:12px; background:rgba(8,22,36,.48); }
+.rental-form h2,.rental-form h3 { margin:0 0 14px; }
+.rental-form .field { margin-bottom:12px; }
+.rental-form textarea { width:100%; min-height:78px; resize:vertical; padding:11px; border:1px solid #29465e; border-radius:8px; color:#f4fbff; background:#091729; font:inherit; }
+.rental-date-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.rental-total { margin:0 0 14px; padding:12px; border:1px solid rgba(57,237,171,.3); border-radius:9px; color:#58ffc0; font-weight:800; }
+.rental-session-bar { margin-bottom:14px; }
+.rental-session-bar p { margin:0; }
+.rental-reservations { display:grid; gap:10px; }
+.rental-reservation-card { display:grid; align-items:start; }
+.rental-reservation-heading { width:100%; }
+.rental-status { padding:5px 9px; border-radius:999px; background:#354359; color:#e8f0ff; font-size:12px; font-weight:800; }
+.rental-status.status-pending { background:#59451a; color:#ffe8a4; }
+.rental-status.status-approved { background:#124d38; color:#9effd0; }
+.rental-status.status-rejected,.rental-status.status-cancelled { background:#522d35; color:#ffc0ca; }
+.rental-status.status-completed { background:#2e3c52; color:#d0e3ff; }
+.rental-admin-note { padding:9px 11px; border-left:3px solid #10b981; background:rgba(16,185,129,.08); }
+.rental-panel .message { margin:8px 0 0; }
 * {
   box-sizing: border-box;
 }
@@ -756,4 +790,15 @@ body.dashboard-mode main > .content-section { display: none; }
     background: transparent;
     backdrop-filter: none;
   }
+}
+
+@media (max-width:760px) {
+  .rental-auth-grid { grid-template-columns:1fr; }
+  .rental-item-card { align-items:flex-start; }
+  .rental-item-card .button { flex:0 0 auto; }
+}
+@media (max-width:460px) {
+  .rental-date-grid { grid-template-columns:1fr; gap:0; }
+  .rental-item-card,.rental-session-bar,.rental-reservation-heading { align-items:flex-start; }
+  .rental-session-bar { flex-direction:column; }
 }
