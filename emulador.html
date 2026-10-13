@@ -17,7 +17,7 @@
       <h1>Emulador no navegador</h1>
       <p class="note">Escolha o sistema e um arquivo de jogo que já esteja no seu computador. O arquivo não é enviado para o site; os saves ficam no armazenamento local do navegador.</p><p id="resume" class="note"></p>
       <h2>Jogo inicial</h2>
-      <div class="starter"><article class="starter-card"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/NES%20Super%20Mario.png?width=640" alt="Console NES com Super Mario Bros."><div><strong>Super Mario Bros. (NES)</strong><p class="note">Selecione sua própria ROM local para jogar.</p><button type="button" id="mario">Escolher ROM do Mario</button></div></article></div>
+      <div class="starter"><article class="starter-card"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/NES%20Super%20Mario.png?width=640" alt="Console NES com Super Mario Bros."><div><strong>Super Mario Bros. (NES)</strong><p class="note">Selecione sua própria ROM local para jogar.</p><button type="button" id="mario">Escolher ROM do Mario</button></div></article><article class="starter-card"><div><strong>Super Mario World (SNES)</strong><p class="note">Selecione sua própria ROM local para jogar.</p><button type="button" id="mario-world">Escolher ROM do Mario World</button></div></article></div>
       <div class="controls">
         <label>Sistema
           <select id="system">
@@ -36,7 +36,7 @@
   <script>
     const start=document.querySelector('#start'), rom=document.querySelector('#rom'), system=document.querySelector('#system'), status=document.querySelector('#status'), params=new URLSearchParams(location.search), resume=document.querySelector('#resume');
     const selected=params.get('game'); if(params.get('system')) system.value=params.get('system'); const previous=JSON.parse(localStorage.getItem('urtador:lastGame')||'null'); if(selected){resume.textContent='Jogo selecionado: '+selected+'. Escolha o arquivo local correspondente para continuar.';localStorage.setItem('urtador:lastGame',JSON.stringify({title:selected,system:system.value,at:Date.now()}))}else if(previous) resume.textContent='Último jogo: '+previous.title+'. Escolha o arquivo local correspondente para continuar.';
-    document.querySelector('#mario').addEventListener('click',()=>{system.value='nes';rom.click()});
+    document.querySelector('#mario').addEventListener('click',()=>{system.value='nes';rom.click()}); document.querySelector('#mario-world').addEventListener('click',()=>{system.value='snes';rom.click()});
     start.addEventListener('click',()=>{
       const file=rom.files[0]; if(!file){status.textContent='Escolha um arquivo primeiro.';return;}
       start.disabled=true; status.textContent='Carregando o emulador...'; localStorage.setItem('urtador:lastFile',JSON.stringify({name:file.name,system:system.value,at:Date.now()}));
