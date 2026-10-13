@@ -1012,7 +1012,7 @@
       const result = await api("login-password", { phone, password, accountNumber: Number(el("login-account-number")?.value || 1) });
       if (result.otpRequired) {
         showAuth("otp");
-        say(el("auth-message"), "Senha confirmada. Digite o código publicado na comunidade Kuttencurtador.");
+        say(el("auth-message"), "Senha confirmada. Peça ao administrador o código associado ao DDD e aos quatro últimos dígitos do telefone.");
         return;
       }
       state.token = result.token; state.user = result.user;
@@ -1049,11 +1049,11 @@
     if (!phoneInput.reportValidity()) return;
     const phone = phoneForRequest("login-phone", "login-dial-code");
     state.phone = phone; storage.setItem("urtador-phone", phone);
-    say(el("auth-message"), "Confirmando se seu telefone está na comunidade…");
+    say(el("auth-message"), "Solicitando código ao suporte…");
     try {
-      await api("request-otp", { phone });
+      const result = await api("request-otp", { phone });
       showAuth("otp");
-      say(el("auth-message"), "Código publicado na comunidade. Confira a mensagem identificada pelo DDD e final do seu telefone.");
+      say(el("auth-message"), result.message);
     } catch (error) { if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), friendlyAuthError(error), true); }
   });
 
@@ -1075,11 +1075,11 @@
     const phone = phoneForRequest("recovery-phone", "recovery-dial-code");
     state.phone = phone;
     storage.setItem("urtador-phone", phone);
-    say(el("auth-message"), "Confirmando sua participação e pedindo o código no grupo…");
+    say(el("auth-message"), "Solicitando código de recuperação ao suporte…");
     try {
       const result = await api("request-password-recovery", { phone });
       showAuth("otp");
-      say(el("auth-message"), `${result.message} Confira a mensagem identificada pelo DDD e final do seu telefone na comunidade Kuttencurtador.`);
+      say(el("auth-message"), result.message);
       el("otp").focus();
     } catch (error) {
       if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), friendlyAuthError(error), true);
@@ -1099,8 +1099,8 @@
         storage.setItem("urtador-password-setup", "1");
         storage.removeItem("urtador-password-recovery");
         showAuth("set-password");
-        el("password-form-help").textContent = "Código da comunidade confirmado. Crie sua senha para concluir o primeiro acesso.";
-        say(el("auth-message"), "Código da comunidade confirmado. Crie sua senha abaixo para concluir o primeiro acesso.");
+        el("password-form-help").textContent = "Código confirmado. Crie sua senha para concluir o primeiro acesso.";
+        say(el("auth-message"), "Código confirmado. Crie sua senha abaixo para concluir o primeiro acesso.");
         el("new-password").focus();
         return;
       }
@@ -1108,7 +1108,7 @@
         state.passwordRecovery = true;
         storage.setItem("urtador-password-recovery", "1");
         showAuth("set-password");
-        el("password-form-help").textContent = "Código da comunidade confirmado. Escolha uma nova senha para recuperar o acesso.";
+        el("password-form-help").textContent = "Código confirmado. Escolha uma nova senha para recuperar o acesso.";
         say(el("auth-message"), "Código confirmado. Defina sua nova senha abaixo.");
         el("new-password").focus();
         return;
@@ -1600,11 +1600,11 @@
   }
   if (state.token && state.passwordRecovery) {
     showAuth("set-password");
-    el("password-form-help").textContent = "Código da comunidade confirmado. Escolha uma nova senha para recuperar o acesso.";
+    el("password-form-help").textContent = "Código confirmado. Escolha uma nova senha para recuperar o acesso.";
     say(el("auth-message"), "Código confirmado. Defina sua nova senha abaixo.");
   } else if (state.token && state.passwordSetupRequired) {
     showAuth("set-password");
-    say(el("auth-message"), "Seu WhatsApp já foi confirmado. Crie sua senha para concluir o primeiro acesso.");
+    say(el("auth-message"), "Seu código foi confirmado. Crie sua senha para concluir o primeiro acesso.");
   } else if (state.token) {
     refreshDashboard().catch((error) => {
       state.token = ""; storage.removeItem("urtador-token"); setLoggedIn(false); showAuth("password");

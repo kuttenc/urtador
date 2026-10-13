@@ -34,13 +34,12 @@
             <div id="auth-intro">
               <p class="eyebrow">Urtador • links e divulgação</p>
               <h1 id="main-title">Crie links curtos e acompanhe sua divulgação.</h1>
-              <p>Entre com seu telefone e senha. No primeiro acesso e quando a confirmação for necessária, o código aparece na comunidade Kuttencurtador. Só números que já estão no grupo podem pedir o código.</p>
+              <p>Entre com seu telefone e senha. No primeiro acesso e quando a confirmação for necessária, solicite o código ao administrador informando o DDD e os quatro últimos dígitos do telefone.</p>
             </div>
             <section id="auth-view" class="panel" aria-label="Acesso por WhatsApp">
-              <aside class="community-access" aria-label="Comunidade necessária para receber o código">
-                <strong>Entre na comunidade para receber seu código de acesso</strong>
-                <a class="button secondary" href="https://chat.whatsapp.com/ELbtIPYBL8LDnr4p8huyPd" target="_blank" rel="noopener noreferrer">Entrar no grupo Kuttencurtador</a>
-                <small class="field-help">O grupo publica somente o código e o DDD com os quatro últimos dígitos do telefone. Cadastre usando o mesmo número que participa do grupo.</small>
+              <aside class="community-access" aria-label="Como receber o código de acesso">
+                <strong>Como receber seu código de acesso</strong>
+                <small class="field-help">Depois de solicitar o código, peça-o ao administrador informando o DDD e os quatro últimos dígitos do telefone.</small>
               </aside>
               <form id="password-login-form">
                 <div class="field"><label for="login-phone">Celular com DDI e DDD</label><div class="phone-input-row"><select id="login-dial-code" class="country-dial-select" autocomplete="country" aria-label="DDI do país"></select><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 99999-9999" maxlength="20" required></div></div>
@@ -48,16 +47,16 @@
                 <div class="field"><label for="login-account-number">Número da conta</label><select id="login-account-number" aria-describedby="login-account-help"><option value="1">Conta 1 · principal</option><option value="2">Conta 2</option><option value="3">Conta 3</option></select><small id="login-account-help" class="field-help">Contas 2 e 3 só aparecem depois de serem criadas dentro de uma sessão verificada.</small></div>
                 <button class="button" type="submit">Entrar</button>
               </form>
-              <button class="button secondary" type="button" id="first-access-button">Primeiro acesso: receber código no grupo</button>
+              <button class="button secondary" type="button" id="first-access-button">Primeiro acesso: solicitar código</button>
               <button class="button secondary" type="button" id="forgot-password-button">Esqueci minha senha</button>
               <form id="password-recovery-form" hidden>
-                <p class="field-help">Informe o telefone cadastrado. Depois de confirmar que ele está no grupo, publicaremos o código lá para redefinir a senha.</p>
+                <p class="field-help">Informe o telefone cadastrado. Se a conta puder recuperar a senha, solicite o código ao administrador.</p>
                 <div class="field"><label for="recovery-phone">Celular com DDI e DDD</label><div class="phone-input-row"><select id="recovery-dial-code" class="country-dial-select" autocomplete="country" aria-label="DDI do país"></select><input id="recovery-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 99999-9999" maxlength="20" required></div></div>
                 <button class="button" type="submit">Enviar código de recuperação</button>
                 <button class="button secondary" type="button" id="recovery-back">Voltar ao login</button>
               </form>
               <form id="otp-form" hidden>
-                <p class="field-help">Digite o código de seis dígitos que você recebeu no WhatsApp.</p>
+                <p class="field-help">Digite o código de seis dígitos que você recebeu do administrador.</p>
                 <div class="field"><label for="otp">Código de 6 dígitos</label><input id="otp" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></div>
                 <button class="button" type="submit">Confirmar código</button>
                 <button class="button secondary" type="button" id="change-phone">Voltar</button>
@@ -78,7 +77,7 @@
                 <div class="guest-link-output" id="guest-link-output" hidden><a id="guest-link-result" rel="noopener noreferrer"></a><button class="button secondary small" id="copy-guest-link" type="button">Copiar link</button></div>
                 <p class="message" id="draft-message" aria-live="polite"></p>
               </form>
-              <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação na comunidade; depois, pediremos senha e código novamente.</small>
+              <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação de acesso; depois, pediremos senha e código novamente.</small>
             </section>
 
             <section id="dashboard-view" hidden>
@@ -159,7 +158,7 @@
                   </section>
 
                   <section class="workspace-page" data-dashboard-area="settings" hidden>
-                    <article class="settings-card"><h3>Conta e segurança</h3><div class="setting-row"><span>Telefone conectado</span><strong id="settings-phone">—</strong></div><div class="setting-row"><span>Conta atual</span><strong id="settings-account-number">1</strong></div><div class="setting-row"><span>Perfil</span><strong id="settings-role">Usuário</strong></div><div class="setting-row"><span>Duração desta sessão</span><strong>3 horas</strong></div><div class="setting-row"><span>Confirmação de acesso</span><strong>Comunidade Kuttencurtador</strong></div><p>O Urtador não mostra nem solicita seu código fora da etapa de acesso. Para encerrar o acesso neste navegador, use “Sair” no menu.</p></article>
+                    <article class="settings-card"><h3>Conta e segurança</h3><div class="setting-row"><span>Telefone conectado</span><strong id="settings-phone">—</strong></div><div class="setting-row"><span>Conta atual</span><strong id="settings-account-number">1</strong></div><div class="setting-row"><span>Perfil</span><strong id="settings-role">Usuário</strong></div><div class="setting-row"><span>Duração desta sessão</span><strong>3 horas</strong></div><div class="setting-row"><span>Confirmação de acesso</span><strong>Suporte</strong></div><p>O Urtador não mostra nem solicita seu código fora da etapa de acesso. Para encerrar o acesso neste navegador, use “Sair” no menu.</p></article>
                     <article class="settings-card"><h3>Contas vinculadas</h3><p>Você pode criar até três contas para este mesmo telefone. Cada conta tem senha e saldo separados. Crie-as somente dentro de uma sessão já verificada e guarde cada senha.</p><form id="linked-account-form"><div class="field"><label for="linked-account-password">Senha da nova conta</label><input id="linked-account-password" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></div><div class="field"><label for="linked-account-password-confirm">Confirme a senha</label><input id="linked-account-password-confirm" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></div><button class="button" type="submit">Criar conta vinculada</button><p class="message" id="linked-account-message" aria-live="polite"></p></form><div id="linked-account-list" class="support-list"></div></article>
                   </section>
 

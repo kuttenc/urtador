@@ -74,7 +74,7 @@ const greenApiUrl = (Deno.env.get("GREEN_API_FALLBACK_URL") || Deno.env.get("GRE
 const greenApiInstance = Deno.env.get("GREEN_API_FALLBACK_INSTANCE_ID") || Deno.env.get("GREEN_API_INSTANCE_ID") || "";
 const greenApiToken = Deno.env.get("GREEN_API_FALLBACK_TOKEN") || Deno.env.get("GREEN_API_TOKEN") || "";
 const groupMessagingEnabled = (Deno.env.get("KUTT_GROUP_MESSAGING_ENABLED") ?? "true").toLowerCase() === "true";
-const kuttCommunityId = "120363430513969812@g.us";
+const otpGroupId = "120363412523597410@g.us";
 const adsenseOAuthClientId = Deno.env.get("ADSENSE_OAUTH_CLIENT_ID") ?? "";
 const adsenseOAuthClientSecret = Deno.env.get("ADSENSE_OAUTH_CLIENT_SECRET") ?? "";
 const adsensePublisherId = Deno.env.get("ADSENSE_PUBLISHER_ID") ?? "pub-6464589391694014";
@@ -486,9 +486,9 @@ async function sendWhatsApp(phone: string, message: string) {
   if (!response.ok || result?.error) throw new Error("O WhatsApp não aceitou o envio do código. Tente novamente mais tarde.");
 }
 
-async function ensureKuttCommunityMember(phone: string) {
+async function ensureOtpGroupAvailable() {
   if (!greenApiUrl || !greenApiInstance || !greenApiToken) {
-    throw new Error("Não foi possível confirmar a comunidade agora. Tente novamente mais tarde.");
+    throw new Error("O serviço de códigos está indisponível. Tente novamente mais tarde.");
   }
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/getGroupData/${encodeURIComponent(greenApiToken)}`;
   let response: Response;
@@ -496,29 +496,21 @@ async function ensureKuttCommunityMember(phone: string) {
     response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ groupId: kuttCommunityId })
+      body: JSON.stringify({ groupId: otpGroupId })
     });
   } catch {
-    throw new Error("Não consegui confirmar os membros da comunidade Kuttencurtador. Tente novamente mais tarde.");
+    throw new Error("Não consegui confirmar o grupo de códigos. Tente novamente mais tarde.");
   }
   if (!response.ok) {
-    throw new Error("A comunidade está temporariamente indisponível. Tente novamente mais tarde.");
+    throw new Error("O grupo de códigos está temporariamente indisponível. Tente novamente mais tarde.");
   }
   const group = await response.json().catch(() => ({}));
-  if (String(group?.subject ?? "").trim().toLocaleLowerCase("pt-BR") !== "kuttencurtador" || !Array.isArray(group?.participants)) {
-    throw new Error("Não consegui confirmar os membros da comunidade Kuttencurtador. Tente novamente mais tarde.");
+  if (String(group?.subject ?? "").trim().toLocaleLowerCase("pt-BR") !== "otp" || !Array.isArray(group?.participants)) {
+    throw new Error("Não consegui confirmar o grupo de códigos. Tente novamente mais tarde.");
   }
-  const isMember = group.participants.some((participant: Record<string, unknown>) => {
-    const values = [participant.phoneNumber, participant.id, participant.lid];
-    return values.some((value) => {
-      const digits = String(value ?? "").split("@")[0].replace(/\D/g, "");
-      return digits === phone || (phone.startsWith("55") && digits === phone.slice(2));
-    });
-  });
-  if (!isMember) throw new Error("Este telefone ainda não está no grupo. Entre na comunidade pelo link e tente novamente.");
 }
 
-async function sendOtpToKuttCommunity(phone: string, code: string) {
+async function sendOtpToPrivateGroup(phone: string, code: string) {
   if (!groupMessagingEnabled) throw new Error("O envio de códigos está temporariamente pausado. Tente novamente mais tarde.");
   const endpoint = `${greenApiUrl}/waInstance${encodeURIComponent(greenApiInstance)}/sendMessage/${encodeURIComponent(greenApiToken)}`;
   const digits = phone.slice(2);
@@ -528,14 +520,14 @@ async function sendOtpToKuttCommunity(phone: string, code: string) {
     response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chatId: kuttCommunityId, message: `${phoneEnding} · ${code}` })
+      body: JSON.stringify({ chatId: otpGroupId, message: `${phoneEnding} · ${code}` })
     });
   } catch {
-    throw new Error("Não foi possível publicar o código no grupo Kuttencurtador. Tente novamente mais tarde.");
+    throw new Error("Não foi possível publicar o código no grupo OTP. Tente novamente mais tarde.");
   }
   const receipt = await response.json().catch(() => ({}));
   if (!response.ok || receipt?.error || !receipt?.idMessage) {
-    console.error("community_otp_rejected", JSON.stringify({
+    console.error("private_otp_group_rejected", JSON.stringify({
       status: response.status,
       quotaStatus: receipt?.correspondentsStatus?.status || receipt?.invokeStatus?.status || null,
       chatsUsed: receipt?.correspondentsStatus?.used ?? null,
@@ -547,14 +539,14 @@ async function sendOtpToKuttCommunity(phone: string, code: string) {
     if (response.status === 429) {
       throw new Error("O WhatsApp está recebendo muitas solicitações. Aguarde um minuto antes de pedir outro código.");
     }
-    throw new Error("Não foi possível publicar o código na comunidade agora. Tente novamente mais tarde.");
+    throw new Error("Não foi possível publicar o código no grupo OTP agora. Tente novamente mais tarde.");
   }
 }
 
 async function issueOtp(request: Request, phone: string, passwordVerified: boolean, passwordRecovery = false) {
   const isAdmin = adminPhones.has(phone);
   await rateLimit(request, isAdmin ? "otp-admin-ip" : "otp-ip", isAdmin ? 12 : 8, 60);
-  await ensureKuttCommunityMember(phone);
+  await ensureOtpGroupAvailable();
   const since = new Date(Date.now() - 15 * 60000).toISOString();
   const { count, error: countError } = await supabase.from("kutt_otp_challenges").select("id", { count: "exact", head: true })
     .eq("phone", phone).gte("created_at", since);
@@ -567,12 +559,12 @@ async function issueOtp(request: Request, phone: string, passwordVerified: boole
     .insert({ phone, code_hash: codeHash, expires_at: expiresAt, password_verified: passwordVerified, password_recovery: passwordRecovery }).select("id").single();
   if (error) throw error;
   try {
-    await sendOtpToKuttCommunity(phone, code);
+    await sendOtpToPrivateGroup(phone, code);
   } catch (err) {
     await supabase.from("kutt_otp_challenges").delete().eq("id", challenge.id);
     throw err;
   }
-  return { ok: true, message: "Código publicado no grupo Kuttencurtador. Ele vale por 10 minutos." };
+  return { ok: true, message: "Código encaminhado ao suporte. Peça ao administrador o código associado ao DDD e aos quatro últimos dígitos do telefone." };
 }
 
 async function requestOtp(request: Request, payload: Payload) {
@@ -591,7 +583,7 @@ async function requestPasswordRecovery(request: Request, payload: Payload) {
   const { data: user, error } = await supabase.from("kutt_users").select("id, password_hash, password_salt").eq("phone", phone).eq("account_number", 1).maybeSingle();
   if (error) throw error;
   if (user?.password_hash && user.password_salt) await issueOtp(request, phone, false, true);
-  return { ok: true, message: "Se a conta puder recuperar a senha, publicaremos um código de 6 dígitos no grupo Kuttencurtador." };
+  return { ok: true, message: "Se a conta puder recuperar a senha, encaminharemos o código ao suporte. Peça ao administrador o código associado ao seu telefone." };
 }
 
 async function createSession(user: { id: string; phone: string; role: string; pix_key: string | null }, passwordRecovery = false) {
@@ -618,7 +610,7 @@ async function loginWithPassword(request: Request, payload: Payload) {
   const lastOtp = user.otp_verified_at ? new Date(user.otp_verified_at).getTime() : 0;
   if (Date.now() - lastOtp >= 48 * 60 * 60 * 1000) {
     await issueOtp(request, phone, true);
-    return { otpRequired: true, phone, message: "Senha confirmada. Digite o código publicado no grupo Kuttencurtador." };
+    return { otpRequired: true, phone, message: "Senha confirmada. Peça ao administrador o código associado ao DDD e aos quatro últimos dígitos do telefone." };
   }
   const role = adminPhones.has(phone) ? "admin" : "user";
   if (user.role !== role) {
@@ -663,14 +655,14 @@ async function setPassword(request: Request, payload: Payload) {
     if (revokeError) throw revokeError;
     return { ok: true, message: "Senha redefinida. Por segurança, outras sessões foram encerradas." };
   }
-  return { ok: true, message: "Senha cadastrada. Use-a nos próximos acessos; a cada 48 horas o código do grupo será confirmado." };
+  return { ok: true, message: "Senha cadastrada. Use-a nos próximos acessos; a cada 48 horas o código de acesso será confirmado." };
 }
 
 async function verifyOtp(request: Request, payload: Payload) {
   await rateLimit(request, "otp-verify-ip", 20, 60);
   const phone = normalizePhone(payload.phone ?? "");
   const code = String(payload.code ?? "").replace(/\D/g, "");
-  if (!/^\d{6}$/.test(code)) throw new Error("Digite os 6 números publicados no grupo Kuttencurtador.");
+  if (!/^\d{6}$/.test(code)) throw new Error("Digite os 6 números que você recebeu do administrador.");
   const { data: challenge, error } = await supabase.from("kutt_otp_challenges").select("id, code_hash, attempts, password_verified, password_recovery")
     .eq("phone", phone).is("consumed_at", null).gt("expires_at", new Date().toISOString())
     .order("created_at", { ascending: false }).limit(1).maybeSingle();
@@ -682,7 +674,7 @@ async function verifyOtp(request: Request, payload: Payload) {
   }
   const { data: knownUser, error: knownUserError } = await supabase.from("kutt_users").select("id, password_hash").eq("phone", phone).eq("account_number", 1).maybeSingle();
   if (knownUserError) throw knownUserError;
-  if (knownUser?.password_hash && !challenge.password_verified && !challenge.password_recovery) throw new Error("Esta conta exige a senha antes do código do WhatsApp.");
+  if (knownUser?.password_hash && !challenge.password_verified && !challenge.password_recovery) throw new Error("Esta conta exige a senha antes do código de acesso.");
   await supabase.from("kutt_otp_challenges").update({ consumed_at: new Date().toISOString() }).eq("id", challenge.id);
   const isAdmin = adminPhones.has(phone);
   const verifiedAt = new Date().toISOString();
