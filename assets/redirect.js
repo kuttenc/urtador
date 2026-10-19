@@ -4,10 +4,13 @@
   const basePath = config.basePath || "/urtador/";
   const statuses = [...document.querySelectorAll("[data-redirect-status]")];
   const openButton = document.querySelector("[data-redirect-open]");
+  const turnstileShell = document.querySelector("[data-turnstile-shell]");
+  const turnstileContainer = document.querySelector("[data-turnstile-container]");
   const path = window.location.pathname;
   const index = path.indexOf(basePath);
   const slug = decodeURIComponent((index >= 0 ? path.slice(index + basePath.length) : path.slice(1)).replace(/^\/+|\/+$/g, ""));
   let readyToOpen = false;
+  let turnstileToken = "";
 
   function write(text) {
     statuses.forEach((status) => { status.textContent = text; });
@@ -22,7 +25,7 @@
       const response = await fetch(apiBase, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "resolve", slug })
+        body: JSON.stringify({ action: "resolve", slug, turnstileToken })
       });
       const data = await response.json().catch(() => ({}));
       if (data.accessExpired) {
@@ -46,6 +49,53 @@
     return;
   }
 
+  function loadTurnstile(siteKey) {
+    return new Promise((resolve, reject) => {
+      if (window.turnstile) { resolve(window.turnstile); return; }
+      const script = document.createElement("script");
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.onload = () => resolve(window.turnstile);
+      script.onerror = () => reject(new Error("Não foi possível carregar a confirmação."));
+      document.head.append(script);
+    });
+  }
+
+  async function prepareTurnstile(configuration) {
+    if (!configuration?.enabled || !configuration.siteKey) {
+      readyToOpen = true;
+      if (openButton) openButton.disabled = false;
+      write("Toque em “Abrir destino” para continuar.");
+      return;
+    }
+    turnstileShell.hidden = false;
+    write("Confirme que você não é um robô para continuar.");
+    const turnstile = await loadTurnstile(configuration.siteKey);
+    turnstile.render(turnstileContainer, {
+      sitekey: configuration.siteKey,
+      theme: "dark",
+      action: "short-link-open",
+      callback(token) {
+        turnstileToken = token;
+        readyToOpen = true;
+        if (openButton) openButton.disabled = false;
+        write("Toque em “Abrir destino” para continuar.");
+      },
+      "expired-callback"() {
+        turnstileToken = "";
+        readyToOpen = false;
+        if (openButton) openButton.disabled = true;
+        write("A confirmação expirou. Confirme novamente para abrir o destino.");
+      },
+      "error-callback"() {
+        turnstileToken = "";
+        readyToOpen = false;
+        if (openButton) openButton.disabled = true;
+        write("Não foi possível concluir a confirmação. Tente recarregar a página.");
+      }
+    });
+  }
+
   async function beginAccessWindow() {
     if (openButton) openButton.disabled = true;
     write("Verificando a disponibilidade do link...");
@@ -62,9 +112,7 @@
         window.location.replace(data.redirectUrl || "https://kuttenc.github.io/");
         return;
       }
-      readyToOpen = true;
-      if (openButton) openButton.disabled = false;
-      write("Toque em “Abrir destino” para continuar.");
+      await prepareTurnstile(data.turnstile);
       const remaining = new Date(data.expiresAt || 0).getTime() - Date.now();
       if (Number.isFinite(remaining) && remaining > 0) {
         window.setTimeout(() => window.location.replace("https://kuttenc.github.io/"), remaining + 100);

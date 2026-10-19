@@ -36,6 +36,7 @@ type Payload = {
   adScripts?: unknown[];
   status?: "approved" | "paid" | "rejected";
   note?: string;
+  turnstileToken?: string;
   username?: string;
   setupKey?: string;
   adminToken?: string;
@@ -83,6 +84,8 @@ const adNotificationGroupId = (Deno.env.get("KUTT_AD_NOTIFICATION_GROUP_ID") ?? 
 const reportCronSecret = Deno.env.get("KUTT_REPORT_CRON_SECRET") ?? "";
 const pixConfirmationWebhookSecret = Deno.env.get("KUTT_PIX_CONFIRMATION_WEBHOOK_SECRET") ?? "";
 const adminSetupKey = Deno.env.get("KUTT_ADMIN_SETUP_KEY") ?? "";
+const turnstileSiteKey = Deno.env.get("TURNSTILE_SITE_KEY") ?? "";
+const turnstileSecretKey = Deno.env.get("TURNSTILE_SECRET_KEY") ?? "";
 const allowedOrigins = new Set((Deno.env.get("ALLOWED_ORIGINS") ?? "https://kuttenc.github.io")
   .split(",").map((v) => v.trim()).filter(Boolean));
 const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
@@ -114,6 +117,24 @@ function corsHeaders(request: Request) {
 
 function json(request: Request, status: number, body: Record<string, unknown>) {
   return new Response(JSON.stringify(body), { status, headers: { ...corsHeaders(request), "Content-Type": "application/json; charset=utf-8" } });
+}
+
+function publicTurnstileConfiguration() {
+  const enabled = Boolean(turnstileSiteKey && turnstileSecretKey);
+  return { enabled, siteKey: enabled ? turnstileSiteKey : null };
+}
+
+async function verifyTurnstile(request: Request, payload: Payload, expectedAction: string) {
+  if (!turnstileSiteKey || !turnstileSecretKey) return;
+  const token = String(payload.turnstileToken ?? "").trim();
+  if (!token) throw new Error("Confirme que você não é um robô para abrir o link.");
+  const form = new URLSearchParams({ secret: turnstileSecretKey, response: token, remoteip: clientIp(request) });
+  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+  if (!response.ok) throw new Error("Não foi possível confirmar a verificação agora. Tente novamente.");
+  const result = await response.json() as { success?: boolean; hostname?: string; action?: string };
+  if (!result.success || result.hostname !== "kuttenc.github.io" || (result.action && result.action !== expectedAction)) {
+    throw new Error("A confirmação não foi aceita. Tente novamente.");
+  }
 }
 
 async function hash(value: string) {
@@ -1010,7 +1031,7 @@ async function startLinkAccessWindow(request: Request, payload: Payload) {
   if (!data || data.disabled_at) throw new Error("Link não encontrado.");
   const access = await linkAccessWindow(data.id, clientIp(request));
   if (access.accessExpired) return { accessExpired: true, redirectUrl: `${publicBaseUrl}/` };
-  return { accessExpired: false, expiresAt: access.expiresAt };
+  return { accessExpired: false, expiresAt: access.expiresAt, turnstile: publicTurnstileConfiguration() };
 }
 
 async function resolveLink(request: Request, payload: Payload) {
@@ -1020,6 +1041,7 @@ async function resolveLink(request: Request, payload: Payload) {
     .eq("slug", slug).maybeSingle();
   if (error) throw error;
   if (!data || data.disabled_at) throw new Error("Link não encontrado.");
+  await verifyTurnstile(request, payload, "short-link-open");
   const userAgent = request.headers.get("user-agent")?.slice(0, 500) ?? "";
   const access = await linkAccessWindow(data.id, clientIp(request));
   if (access.accessExpired) return { accessExpired: true, redirectUrl: `${publicBaseUrl}/` };
