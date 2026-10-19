@@ -1057,6 +1057,13 @@
     } catch (error) { if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), friendlyAuthError(error), true); }
   });
 
+  el("guest-panel-button")?.addEventListener("click", () => {
+    const phoneInput = el("login-phone");
+    document.getElementById("auth-view")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    phoneInput.focus();
+    say(el("auth-message"), "Informe seu telefone com DDI e DDD. Se ainda não houver conta, entre no grupo OTP e solicite o código para abrir seu painel.");
+  });
+
   el("forgot-password-button")?.addEventListener("click", () => {
     el("recovery-dial-code").value = el("login-dial-code").value;
     el("recovery-phone").value = el("login-phone").value.trim();
@@ -1342,13 +1349,15 @@
     const output = el("guest-link-output");
     button.disabled = true;
     output.hidden = true;
+    el("guest-panel-cta").hidden = true;
     say(el("draft-message"), "Criando seu link…");
     api("create", { url: el("pending-url").value, guestSessionId: guestSessionId() }).then((result) => {
       const anchor = el("guest-link-result");
       anchor.href = result.shortUrl;
       anchor.textContent = result.shortUrl;
       output.hidden = false;
-      say(el("draft-message"), "Link pronto. Ele será vinculado à sua conta se você entrar neste mesmo navegador.");
+      el("guest-panel-cta").hidden = false;
+      say(el("draft-message"), "Link pronto. Vincule-o ao seu painel para não perder seus links e acompanhar as visitas.");
       if (typeof window.gtag === "function") window.gtag("event", "urtador_link_created", { event_category: "engagement", event_label: "guest_short_link" });
     }).catch((error) => say(el("draft-message"), error.message, true)).finally(() => { button.disabled = false; });
   });

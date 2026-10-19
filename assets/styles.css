@@ -595,6 +595,9 @@ th { color: #91a8c6; }
 .turnstile-box { display: grid; justify-items: center; gap: 10px; margin: 18px auto; padding: 14px; max-width: 320px; border: 1px solid rgba(67,225,166,.22); border-radius: 10px; background: rgba(9,19,33,.62); }
 .turnstile-box[hidden] { display: none !important; }
 .turnstile-box p { margin: 0; color: #d7e6f4; font-size: .88rem; }
+.guest-panel-cta { margin-top: 14px; padding: 14px; border: 1px solid rgba(67,225,166,.28); border-radius: 10px; background: rgba(9,19,33,.55); }
+.guest-panel-cta[hidden] { display: none !important; }
+.guest-panel-cta p { margin: 8px 0 12px; color: var(--muted); font-size: .9rem; line-height: 1.5; }
 .redirect-continue {
   display: inline-flex;
   margin-top: 12px;

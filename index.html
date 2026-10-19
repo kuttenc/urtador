@@ -39,7 +39,8 @@
             <section id="auth-view" class="panel" aria-label="Acesso por WhatsApp">
               <aside class="community-access" aria-label="Como receber o código de acesso">
                 <strong>Como receber seu código de acesso</strong>
-                <small class="field-help">Depois de solicitar o código, peça-o ao administrador informando o DDD e os quatro últimos dígitos do telefone.</small>
+                <small class="field-help">No primeiro acesso, informe seu telefone com DDI e DDD, entre no grupo OTP e confirme o código de seis dígitos.</small>
+                <a class="button secondary small" href="https://chat.whatsapp.com/GgeD65TTur14LyayTrm1D5" target="_blank" rel="noopener noreferrer">Entrar no grupo OTP</a>
               </aside>
               <form id="password-login-form">
                 <div class="field"><label for="login-phone">Celular com DDI e DDD</label><div class="phone-input-row"><select id="login-dial-code" class="country-dial-select" autocomplete="country" aria-label="DDI do país"></select><input id="login-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="(11) 99999-9999" maxlength="20" required></div></div>
@@ -71,10 +72,11 @@
               <p class="message" id="auth-message" aria-live="polite"></p>
               <form id="prelogin-link-form" class="prelogin-link-form">
                 <h3>Encurte sem cadastro</h3>
-                <p class="field-help">Crie e compartilhe seu link agora. Se entrar depois neste mesmo navegador, o link será anexado à sua conta.</p>
+                <p class="field-help">Crie e compartilhe seu link agora. Depois, vincule-o a um painel pelo telefone para manter seus links e acompanhar as visitas.</p>
                 <div class="field"><label for="pending-url">Endereço do link</label><input id="pending-url" name="url" type="url" inputmode="url" placeholder="https://exemplo.com/pagina" autocomplete="url" required></div>
                 <button class="button" type="submit">Encurtar link</button>
                 <div class="guest-link-output" id="guest-link-output" hidden><a id="guest-link-result" rel="noopener noreferrer"></a><button class="button secondary small" id="copy-guest-link" type="button">Copiar link</button></div>
+                <section class="guest-panel-cta" id="guest-panel-cta" hidden aria-live="polite"><strong>Seu link foi criado.</strong><p>Informe seu telefone com DDI e DDD acima para vincular este link ao seu painel. Se for seu primeiro acesso, entre no grupo OTP e confirme o código.</p><button class="button secondary small" id="guest-panel-button" type="button">Vincular ao meu painel</button></section>
                 <p class="message" id="draft-message" aria-live="polite"></p>
               </form>
               <small class="field-help">A sessão dura 3 horas. A senha vale por até 48 horas desde a última confirmação de acesso; depois, pediremos senha e código novamente.</small>
