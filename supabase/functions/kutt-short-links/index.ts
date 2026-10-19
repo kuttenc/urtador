@@ -973,6 +973,46 @@ function looksAutomated(userAgent: string) {
   return /bot|crawler|spider|preview|facebookexternalhit|whatsapp|slack|discord|curl|wget|headless|phantom|monitor|uptime/i.test(userAgent);
 }
 
+async function linkAccessWindow(linkId: string, ip: string) {
+  const visitorHash = ip === "unknown" ? "" : await hash(ip);
+  if (!visitorHash) return { accessExpired: false, visitorHash, expiresAt: null };
+  const now = new Date();
+  const { error: insertError } = await supabase.from("kutt_link_access_windows").insert({
+    link_id: linkId,
+    visitor_ip_hash: visitorHash,
+    first_accessed_at: now.toISOString(),
+    last_accessed_at: now.toISOString(),
+    expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
+  });
+  if (insertError && insertError.code !== "23505") throw insertError;
+  const { data: window, error: windowError } = await supabase.from("kutt_link_access_windows")
+    .select("expires_at")
+    .eq("link_id", linkId)
+    .eq("visitor_ip_hash", visitorHash)
+    .single();
+  if (windowError) throw windowError;
+  const accessExpired = new Date(window.expires_at).getTime() <= now.getTime();
+  if (!accessExpired) {
+    const { error: touchError } = await supabase.from("kutt_link_access_windows")
+      .update({ last_accessed_at: now.toISOString() })
+      .eq("link_id", linkId)
+      .eq("visitor_ip_hash", visitorHash);
+    if (touchError) throw touchError;
+  }
+  return { accessExpired, visitorHash, expiresAt: window.expires_at };
+}
+
+async function startLinkAccessWindow(request: Request, payload: Payload) {
+  await rateLimit(request, "link-access-window", 120, 60);
+  const slug = normalizeSlug(payload.slug);
+  const { data, error } = await supabase.from("kutt_short_links").select("id, disabled_at").eq("slug", slug).maybeSingle();
+  if (error) throw error;
+  if (!data || data.disabled_at) throw new Error("Link não encontrado.");
+  const access = await linkAccessWindow(data.id, clientIp(request));
+  if (access.accessExpired) return { accessExpired: true, redirectUrl: `${publicBaseUrl}/` };
+  return { accessExpired: false, expiresAt: access.expiresAt };
+}
+
 async function resolveLink(request: Request, payload: Payload) {
   await rateLimit(request, "resolve", 120, 60);
   const slug = normalizeSlug(payload.slug);
@@ -981,33 +1021,9 @@ async function resolveLink(request: Request, payload: Payload) {
   if (error) throw error;
   if (!data || data.disabled_at) throw new Error("Link não encontrado.");
   const userAgent = request.headers.get("user-agent")?.slice(0, 500) ?? "";
-  const ip = clientIp(request);
-  const visitorHash = ip === "unknown" ? "" : await hash(ip);
-  if (visitorHash) {
-    const now = new Date();
-    const { error: insertError } = await supabase.from("kutt_link_access_windows").insert({
-      link_id: data.id,
-      visitor_ip_hash: visitorHash,
-      first_accessed_at: now.toISOString(),
-      last_accessed_at: now.toISOString(),
-      expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
-    });
-    if (insertError && insertError.code !== "23505") throw insertError;
-    const { data: window, error: windowError } = await supabase.from("kutt_link_access_windows")
-      .select("expires_at")
-      .eq("link_id", data.id)
-      .eq("visitor_ip_hash", visitorHash)
-      .single();
-    if (windowError) throw windowError;
-    if (new Date(window.expires_at).getTime() <= now.getTime()) {
-      return { accessExpired: true, redirectUrl: `${publicBaseUrl}/` };
-    }
-    const { error: touchError } = await supabase.from("kutt_link_access_windows")
-      .update({ last_accessed_at: now.toISOString() })
-      .eq("link_id", data.id)
-      .eq("visitor_ip_hash", visitorHash);
-    if (touchError) throw touchError;
-  }
+  const access = await linkAccessWindow(data.id, clientIp(request));
+  if (access.accessExpired) return { accessExpired: true, redirectUrl: `${publicBaseUrl}/` };
+  const visitorHash = access.visitorHash;
   const eligible = Boolean(data.owner_user_id) && !looksAutomated(userAgent) && Boolean(visitorHash) && visitorHash !== data.creator_ip_hash;
   // Only a human-confirmed destination open with a known, non-creator IP can affect clicks or rewards.
   // The database function commits the event, link counter, and reward together and enforces daily deduplication.
@@ -1871,6 +1887,7 @@ Deno.serve(async (request) => {
       case "set-ad-revenue-notifications": return json(request, 200, await setAdRevenueNotificationPreference(request, payload));
       case "create": return json(request, 200, await createLink(request, payload));
       case "claim-guest-links": return json(request, 200, await claimGuestLinks(request, payload));
+      case "start-link-access-window": return json(request, 200, await startLinkAccessWindow(request, payload));
       case "resolve": return json(request, 200, await resolveLink(request, payload));
       case "save-pix": return json(request, 200, await setPix(request, payload));
       case "withdraw": return json(request, 200, await requestWithdrawal(request, payload));

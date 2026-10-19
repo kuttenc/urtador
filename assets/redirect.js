@@ -7,13 +7,14 @@
   const path = window.location.pathname;
   const index = path.indexOf(basePath);
   const slug = decodeURIComponent((index >= 0 ? path.slice(index + basePath.length) : path.slice(1)).replace(/^\/+|\/+$/g, ""));
+  let readyToOpen = false;
 
   function write(text) {
     statuses.forEach((status) => { status.textContent = text; });
   }
 
   openButton?.addEventListener("click", async () => {
-    if (openButton.disabled) return;
+    if (openButton.disabled || !readyToOpen) return;
     openButton.disabled = true;
     openButton.textContent = "Abrindo destino…";
     write("Abrindo o destino solicitado...");
@@ -45,5 +46,33 @@
     return;
   }
 
-  write("Toque em “Abrir destino” para continuar.");
+  async function beginAccessWindow() {
+    if (openButton) openButton.disabled = true;
+    write("Verificando a disponibilidade do link...");
+    try {
+      const response = await fetch(apiBase, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "start-link-access-window", slug })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Link não encontrado.");
+      if (data.accessExpired) {
+        write("O período de acesso deste link terminou. Voltando ao Urtador...");
+        window.location.replace(data.redirectUrl || "https://kuttenc.github.io/");
+        return;
+      }
+      readyToOpen = true;
+      if (openButton) openButton.disabled = false;
+      write("Toque em “Abrir destino” para continuar.");
+      const remaining = new Date(data.expiresAt || 0).getTime() - Date.now();
+      if (Number.isFinite(remaining) && remaining > 0) {
+        window.setTimeout(() => window.location.replace("https://kuttenc.github.io/"), remaining + 100);
+      }
+    } catch (error) {
+      write(error.message || "Não foi possível verificar este link.");
+    }
+  }
+
+  beginAccessWindow();
 })();

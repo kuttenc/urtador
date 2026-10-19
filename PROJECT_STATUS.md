@@ -23,7 +23,7 @@ Atualizado em 19/10/2026.
 ## Publicidade e links
 
 - A página curta pode exibir um banner Adsterra identificado; o anúncio não bloqueia o redirecionamento, não exige interação e não usa temporizador.
-- O primeiro acesso de cada hash de IP a cada link abre uma janela fixa de 15 minutos. Depois disso a rota volta à página principal, que restaura o painel quando existir sessão válida.
+- O carregamento inicial de cada rota curta abre uma janela fixa de 15 minutos por hash de IP e link. Depois disso a rota volta à página principal, que restaura o painel quando existir sessão válida.
 - Todo destino cadastrado deve ser validado no servidor antes de ser publicado como link curto.
 
 ## Verificação antes de publicar
