@@ -8,6 +8,7 @@ Atualizado em 19/10/2026.
 - Compatibilidade de links existentes: `https://kuttenc.github.io/urtador/`
 - Repositório público: `https://github.com/kuttenc/urtador`
 - O produto cria links curtos, registra visitas qualificadas, mantém saldo e oferece painel administrativo.
+- Em 19/10/2026, a arte lateral do acesso foi removida e o painel recebeu a identidade Neon: superfícies pretas, sinalização vermelha e contornos azuis luminosos.
 
 ## Acesso
 
