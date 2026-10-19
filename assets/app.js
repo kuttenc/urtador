@@ -80,6 +80,9 @@
   }
   populateDialSelect("login-dial-code");
   populateDialSelect("recovery-dial-code");
+  populateDialSelect("guest-panel-dial-code");
+  let guestPanelCountdownTimer = 0;
+  let guestPanelDeadline = 0;
   let adsenseTokenClient = null;
   const adsenseOAuthStorageKey = "urtador-adsense-oauth-client-id";
   const adsenseOAuthClientId = () => String(storage.getItem(adsenseOAuthStorageKey) || config.adsenseOAuthClientId || "").trim();
@@ -1057,11 +1060,49 @@
     } catch (error) { if (!showExistingCodeIfRateLimited(error)) say(el("auth-message"), friendlyAuthError(error), true); }
   });
 
-  el("guest-panel-button")?.addEventListener("click", () => {
-    const phoneInput = el("login-phone");
-    document.getElementById("auth-view")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    phoneInput.focus();
-    say(el("auth-message"), "Informe seu telefone com DDI e DDD. Se ainda não houver conta, entre no grupo OTP e solicite o código para abrir seu painel.");
+  function updateGuestPanelCountdown() {
+    const remaining = Math.max(0, guestPanelDeadline - Date.now());
+    const minutes = Math.floor(remaining / 60000);
+    const seconds = Math.floor((remaining % 60000) / 1000);
+    el("guest-panel-countdown").textContent = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    if (remaining > 0) return;
+    window.clearInterval(guestPanelCountdownTimer);
+    el("guest-panel-form").querySelectorAll("input, select, button").forEach((field) => { field.disabled = true; });
+    say(el("guest-panel-message"), "O tempo terminou. Seu link continua guardado neste navegador; entre pelo acesso principal para vinculá-lo depois.", true);
+  }
+
+  function startGuestPanelCountdown() {
+    window.clearInterval(guestPanelCountdownTimer);
+    guestPanelDeadline = Date.now() + 5 * 60 * 1000;
+    el("guest-panel-form").querySelectorAll("input, select, button").forEach((field) => { field.disabled = false; });
+    say(el("guest-panel-message"), "");
+    updateGuestPanelCountdown();
+    guestPanelCountdownTimer = window.setInterval(updateGuestPanelCountdown, 1000);
+  }
+
+  el("guest-panel-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (Date.now() >= guestPanelDeadline) { updateGuestPanelCountdown(); return; }
+    const phoneInput = el("guest-panel-phone");
+    if (!phoneInput.reportValidity()) return;
+    const phone = phoneForRequest("guest-panel-phone", "guest-panel-dial-code");
+    state.phone = phone;
+    storage.setItem("urtador-phone", phone);
+    restorePhoneInput(phone, "login-phone", "login-dial-code");
+    const button = event.currentTarget.querySelector("button[type='submit']");
+    button.disabled = true;
+    say(el("guest-panel-message"), "Solicitando código para vincular seu painel…");
+    try {
+      const result = await api("request-otp", { phone });
+      window.clearInterval(guestPanelCountdownTimer);
+      showAuth("otp");
+      say(el("auth-message"), `${result.message} Entre no grupo OTP se ainda não estiver nele.`);
+      document.getElementById("auth-view")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      el("otp").focus();
+    } catch (error) {
+      say(el("guest-panel-message"), friendlyAuthError(error), true);
+      button.disabled = false;
+    }
   });
 
   el("forgot-password-button")?.addEventListener("click", () => {
@@ -1357,6 +1398,7 @@
       anchor.textContent = result.shortUrl;
       output.hidden = false;
       el("guest-panel-cta").hidden = false;
+      startGuestPanelCountdown();
       say(el("draft-message"), "Link pronto. Vincule-o ao seu painel para não perder seus links e acompanhar as visitas.");
       if (typeof window.gtag === "function") window.gtag("event", "urtador_link_created", { event_category: "engagement", event_label: "guest_short_link" });
     }).catch((error) => say(el("draft-message"), error.message, true)).finally(() => { button.disabled = false; });

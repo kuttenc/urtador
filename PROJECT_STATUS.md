@@ -13,6 +13,7 @@ Atualizado em 19/10/2026.
 
 - O fluxo de acesso usa telefone, senha e código de seis dígitos conforme a regra server-side vigente.
 - Quem cria um link antes do cadastro pode vinculá-lo ao painel no mesmo navegador: informa telefone com DDI/DDD, entra no grupo OTP, confirma o código e cria a senha. A função anexa os links convidados à conta criada.
+- Após criar o primeiro link convidado, a tela exibe uma prévia do painel e uma janela visual de cinco minutos para informar o telefone. O prazo só fecha o atalho visual; o link convidado permanece no navegador para vínculo posterior pelo acesso principal.
 - Mensagens de falha devem ser neutras: não citar Green API, nome de instância, token, fila ou detalhes de infraestrutura.
 - O link da comunidade pode aparecer como orientação de acesso, mas o backend deve continuar sendo a fonte de verdade de autorização e limite de tentativas.
 
