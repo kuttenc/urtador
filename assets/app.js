@@ -901,7 +901,7 @@
       }
     }
     el("ad-owner-summary").textContent = `Titularidade dos anúncios salvos: Fabio ${ownerCounts.owner}; Matheus ${ownerCounts.mateus}; sem titular ${ownerCounts.missing}. Esta identificação organiza os códigos, não mede o faturamento.`;
-    say(el("ad-config-message"), savedSlots.length ? "" : "Nenhum anúncio está ativo. Cole um código oficial aprovado pelo fornecedor para habilitar a publicidade na Guia.");
+    say(el("ad-config-message"), savedSlots.length ? "" : "Nenhum anúncio está ativo. Cole um código oficial aprovado pelo fornecedor para habilitar a publicidade nas áreas identificadas do Urtador.");
     say(el("admin-load-message"), "Dados atualizados. Contas vazias aparecem com zero; o traço indica que a leitura ainda não foi concluída.");
     await refreshRentalAdmin();
     await loadAdminAdRevenue();
@@ -1326,7 +1326,7 @@
         adScripts: Array.from({ length: 6 }, (_, index) => ({ title: el(`banner-title-${index + 1}`).value, code: el(`banner-code-${index + 1}`).value, owner: el(`banner-owner-${index + 1}`).value }))
       });
       const groupNotice = result.notificationSent ? " Aviso enviado à comunidade Kuttencurtador." : " O aviso não pôde ser enviado à comunidade agora.";
-      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) Adsterra somente na Guia. O destino não depende de interação com o anúncio. O AdSense continua desligado até aprovação.${groupNotice}`);
+      say(el("ad-config-message"), `Configuração salva: ${result.adConfiguration.slots.length} banner(s) Adsterra nas áreas identificadas do Urtador. O destino não depende de interação com o anúncio nem usa temporizador. O AdSense continua desligado até aprovação.${groupNotice}`);
       await refreshAdmin();
     } catch (error) {
       say(el("ad-config-message"), error.message, true);

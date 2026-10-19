@@ -982,11 +982,36 @@ async function resolveLink(request: Request, payload: Payload) {
   if (!data || data.disabled_at) throw new Error("Link não encontrado.");
   const userAgent = request.headers.get("user-agent")?.slice(0, 500) ?? "";
   const ip = clientIp(request);
-  const eligible = Boolean(data.owner_user_id) && !looksAutomated(userAgent) && ip !== "unknown" && (await hash(ip)) !== data.creator_ip_hash;
+  const visitorHash = ip === "unknown" ? "" : await hash(ip);
+  if (visitorHash) {
+    const now = new Date();
+    const { error: insertError } = await supabase.from("kutt_link_access_windows").insert({
+      link_id: data.id,
+      visitor_ip_hash: visitorHash,
+      first_accessed_at: now.toISOString(),
+      last_accessed_at: now.toISOString(),
+      expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
+    });
+    if (insertError && insertError.code !== "23505") throw insertError;
+    const { data: window, error: windowError } = await supabase.from("kutt_link_access_windows")
+      .select("expires_at")
+      .eq("link_id", data.id)
+      .eq("visitor_ip_hash", visitorHash)
+      .single();
+    if (windowError) throw windowError;
+    if (new Date(window.expires_at).getTime() <= now.getTime()) {
+      return { accessExpired: true, redirectUrl: `${publicBaseUrl}/` };
+    }
+    const { error: touchError } = await supabase.from("kutt_link_access_windows")
+      .update({ last_accessed_at: now.toISOString() })
+      .eq("link_id", data.id)
+      .eq("visitor_ip_hash", visitorHash);
+    if (touchError) throw touchError;
+  }
+  const eligible = Boolean(data.owner_user_id) && !looksAutomated(userAgent) && Boolean(visitorHash) && visitorHash !== data.creator_ip_hash;
   // Only a human-confirmed destination open with a known, non-creator IP can affect clicks or rewards.
   // The database function commits the event, link counter, and reward together and enforces daily deduplication.
   if (eligible) {
-    const visitorHash = await hash(ip);
     const visitDay = saoPauloDay();
     const { error: recordError } = await supabase.rpc("kutt_record_qualified_click", {
       row_id: data.id,
