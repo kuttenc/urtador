@@ -1,6 +1,6 @@
 # Urtador — melhorias futuras
 
-Atualizado em 19/10/2026.
+Atualizado em 22/10/2026.
 
 ## Próxima prioridade
 
@@ -15,6 +15,7 @@ Atualizado em 19/10/2026.
 3. Manter contas adicionais por telefone e a mesclagem de lucros como regras de backend auditáveis, caso esse fluxo permaneça ativo.
 4. Documentar cada mudança de regra de repasse com data de vigência.
 5. Manter o painel público do Validade PT260 limitado a informações não sensíveis e a referências de sessão com expiração.
+6. Ao ampliar o painel do Validade PT260, consumir somente dados retornados pelo endpoint de sessão e manter qualquer dado operacional identificado no Supabase privado.
 
 ## Critérios para concluir um item
 

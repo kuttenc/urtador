@@ -11,6 +11,15 @@ Atualizado em 22/10/2026.
 - Em 19/10/2026, a arte lateral do acesso foi removida e o painel recebeu a identidade Neon: superfícies pretas, sinalização vermelha e contornos azuis luminosos.
 - O caminho público `validade-pt260/` é o painel integrado do Validade PT260. Ele é aberto pelo app com uma referência opaca de sessão e não recebe telefone, IP, credenciais ou identificadores de aparelho.
 
+## Painel público do Validade PT260
+
+- Fonte: `validade-pt260/index.html`, `validade-pt260/styles.css` e `validade-pt260/app.js`.
+- URL publicada: `https://kuttenc.github.io/urtador/validade-pt260/`.
+- A página só reconhece uma sessão quando recebe `?s=<referência UUID>` emitida pelo app. Sem essa referência, mostra a orientação para abrir pelo aplicativo.
+- A página chama `validity-group-web-session` com `GET`; a resposta contém apenas idioma e expiração. Nunca incluir telefone, IP, dados de dispositivo, chaves do Supabase, URLs internas ou segredos no JavaScript público.
+- `deploy-pages.yml` precisa manter a cópia `cp -R validade-pt260 _site/validade-pt260`; sem essa linha a pasta existe no Git, mas não chega ao GitHub Pages.
+- Alterações nesses três arquivos podem ser publicadas via `main` sem gerar APK/AAB. A integração nativa, a câmera e a sessão inicial pertencem ao projeto `ValidadePRODark`.
+
 ## Acesso
 
 - O fluxo de acesso usa telefone, senha e código de seis dígitos conforme a regra server-side vigente.
