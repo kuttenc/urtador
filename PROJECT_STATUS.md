@@ -1,6 +1,6 @@
 # Urtador — estado atual
 
-Atualizado em 19/10/2026.
+Atualizado em 22/10/2026.
 
 ## Produto
 
@@ -9,6 +9,7 @@ Atualizado em 19/10/2026.
 - Repositório público: `https://github.com/kuttenc/urtador`
 - O produto cria links curtos, registra visitas qualificadas, mantém saldo e oferece painel administrativo.
 - Em 19/10/2026, a arte lateral do acesso foi removida e o painel recebeu a identidade Neon: superfícies pretas, sinalização vermelha e contornos azuis luminosos.
+- O caminho público `validade-pt260/` é o painel integrado do Validade PT260. Ele é aberto pelo app com uma referência opaca de sessão e não recebe telefone, IP, credenciais ou identificadores de aparelho.
 
 ## Acesso
 

@@ -14,6 +14,7 @@ Atualizado em 19/10/2026.
 2. Exibir ao administrador o status operacional de mensageria de forma privada e genérica.
 3. Manter contas adicionais por telefone e a mesclagem de lucros como regras de backend auditáveis, caso esse fluxo permaneça ativo.
 4. Documentar cada mudança de regra de repasse com data de vigência.
+5. Manter o painel público do Validade PT260 limitado a informações não sensíveis e a referências de sessão com expiração.
 
 ## Critérios para concluir um item
 
