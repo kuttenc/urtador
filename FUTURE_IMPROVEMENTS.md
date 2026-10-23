@@ -36,3 +36,5 @@ Atualizado em 23/10/2026.
 9. Caso seja necessário registrar aceite de termos para lances ou pagamentos, implementar esse registro no backend com versão dos termos, data, conta autenticada e política de retenção; o aceite local atual é apenas para navegar na página estática.
 
 10. Incluir no perfil Rapidao histórico de anúncios e lances somente depois que as tabelas, regras de autorização, retenção e auditoria do módulo de lances forem publicadas.
+
+11. Antes de usar comparações de mercado ou alegações de liderança no Leilão Rapidão, reunir evidência objetiva e manter a data e a fonte da comparação.
