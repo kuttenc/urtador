@@ -1,6 +1,6 @@
 # Urtador — melhorias futuras
 
-Atualizado em 22/10/2026.
+Atualizado em 23/10/2026.
 
 ## Próxima prioridade
 
@@ -29,5 +29,6 @@ Atualizado em 22/10/2026.
 
 
 7. Manter a ponte do painel Grupo limitada a comandos explícitos do Android e adicionar comandos somente com implementação nativa correspondente.
+8. Criar o backend do Rapidao somente após definir a validação do anunciante, o registro auditável de lance, o encerramento da oferta e o fluxo de pagamento. Exibir IMEI e dados de procedência apenas em uma área autenticada e quando forem necessários à negociação.
 
 

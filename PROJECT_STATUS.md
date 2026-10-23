@@ -1,6 +1,6 @@
 # Urtador — estado atual
 
-Atualizado em 22/10/2026.
+Atualizado em 23/10/2026.
 
 ## Produto
 
@@ -8,6 +8,7 @@ Atualizado em 22/10/2026.
 - Compatibilidade de links existentes: `https://kuttenc.github.io/urtador/`
 - Repositório público: `https://github.com/kuttenc/urtador`
 - O produto cria links curtos, registra visitas qualificadas, mantém saldo e oferece painel administrativo.
+- A página pública `rapidao/` foi criada para apresentar anúncios unitários e encaminhar a autenticação para o fluxo OTP já existente no Urtador. O primeiro anúncio é um iPhone 12 usado com lance mínimo declarado de R$ 234,00. Ela não aceita pagamentos, não reserva itens e não grava lances enquanto não houver backend próprio e verificação do anunciante.
 - Em 19/10/2026, a arte lateral do acesso foi removida e o painel recebeu a identidade Neon: superfícies pretas, sinalização vermelha e contornos azuis luminosos.
 - O caminho público `validade-pt260/` é o painel integrado do Validade PT260. Ele é aberto pelo app com uma referência opaca de sessão e não recebe telefone, IP, credenciais ou identificadores de aparelho.
 
