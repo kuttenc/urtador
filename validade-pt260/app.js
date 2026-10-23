@@ -72,7 +72,11 @@
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error("session");
       applyLanguage(data.language === "pt-BR" ? "pt-BR" : "en");
-      renderEvents(Array.isArray(data.events) ? data.events : []);
+      if (!Array.isArray(data.events)) {
+        byId("report-summary").textContent = "Atualizando o relatório desta sessão…";
+        return;
+      }
+      renderEvents(data.events);
     } catch (_) {
       byId("notice").textContent = copy.error;
       byId("report-summary").textContent = "";
@@ -89,4 +93,5 @@
   byId("refresh").addEventListener("click", load);
   load();
 })();
+
 
