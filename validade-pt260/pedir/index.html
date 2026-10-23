@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="theme-color" content="#050505">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Validade PT260 · Pedir itens</title>
+    <link rel="stylesheet" href="./pedir.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topline"><a href="../" id="back">← GRUPO</a><span class="dot"></span><span>PEDIDOS · PT260</span><span id="state">CONECTANDO</span></header>
+      <section class="hero"><p class="kicker">ASSISTENTE DE PEDIDOS</p><h1>Monte o pedido.<br>Eu organizo.</h1><p>Envie a lista inteira como ela foi escrita. O assistente separa itens, quantidades e unidades para você revisar antes de encaminhar ao grupo.</p></section>
+      <section class="chat" aria-label="Conversa com assistente de pedidos">
+        <article class="bubble bot"><strong>Robô de pedidos</strong><p>Posso ler listas longas, itens separados por “//” e categorias como bebidas, polpas ou limpeza.</p><p>Escreva quantidade e unidade quando puder: <b>3 caixas de água</b>, <b>2 fardos de refrigerante</b> ou <b>1 garrafa de vinho</b>.</p></article>
+        <article class="bubble guide"><strong>Formato sugerido</strong><p>Pedido do Bar - P5<br>3 caixas de água sem gás<br>2 fardos de refrigerante<br>1 pacote de polpa de maracujá</p></article>
+      </section>
+      <section class="panel">
+        <label for="destination">Destino do pedido</label>
+        <input id="destination" maxlength="80" placeholder="Ex.: Bar P5">
+        <label for="source">Cole a lista de pedidos</label>
+        <textarea id="source" rows="12" maxlength="12000" placeholder="Cole aqui a lista completa. Não precisa apagar títulos ou categorias."></textarea>
+        <div class="actions"><button id="parse" type="button">REVISAR LISTA</button><button id="clear" type="button" class="secondary">LIMPAR</button></div>
+        <p id="notice" class="notice" aria-live="polite"></p>
+      </section>
+      <section id="review" class="panel review" hidden>
+        <div class="review-head"><div><p class="kicker">REVISÃO</p><h2 id="review-title">Itens reconhecidos</h2></div><span id="count">0 itens</span></div>
+        <p class="review-copy">Edite os campos marcados antes de enviar. Itens sem quantidade ficam destacados para conferência.</p>
+        <div id="items" class="items"></div>
+        <div class="actions end"><button id="copy" type="button" class="secondary">COPIAR PEDIDO</button><button id="send" type="button">ENVIAR AO GRUPO</button></div>
+        <p id="send-status" class="notice" aria-live="polite"></p>
+      </section>
+    </main>
+    <script src="./pedir.js"></script>
+  </body>
+</html>

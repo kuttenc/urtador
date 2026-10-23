@@ -98,6 +98,7 @@
   });
   if (nativePanel) {
     byId("cloud-actions").hidden = false;
+    byId("open-orders").href = `pedir/?s=${encodeURIComponent(ref)}`;
     byId("open-collection").addEventListener("click", () => window.PT260Grupo.openCollection());
     byId("print-selection").addEventListener("click", () => {
       if (!document.querySelector(".report-check:checked")) {

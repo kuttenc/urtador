@@ -43,3 +43,5 @@ Atualizado em 23/10/2026.
 13. Integrar o importador manual do Chrome a um endpoint autenticado do projeto isolado do Leilão Rapidão, com upload de fotos em armazenamento privado, revisão antes de publicar, trilha de auditoria e validação de titularidade do anunciante.
 
 14. Conectar a página `rapidao/cadastro/` ao mesmo fluxo autenticado de rascunho e publicação, preservando a prévia local e evitando que fotos sejam publicadas sem revisão do anunciante.
+
+15. Ampliar o assistente web de pedidos do Validade PT260 somente com regras de catálogo revisadas pela operação; manter confirmação humana para itens sem quantidade ou unidade reconhecida.
