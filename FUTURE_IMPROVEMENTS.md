@@ -32,3 +32,5 @@ Atualizado em 23/10/2026.
 8. Criar o backend do Rapidao somente após definir a validação do anunciante, o registro auditável de lance, o encerramento da oferta e o fluxo de pagamento. Exibir IMEI e dados de procedência apenas em uma área autenticada e quando forem necessários à negociação.
 
 
+
+9. Caso seja necessário registrar aceite de termos para lances ou pagamentos, implementar esse registro no backend com versão dos termos, data, conta autenticada e política de retenção; o aceite local atual é apenas para navegar na página estática.
