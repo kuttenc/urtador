@@ -30,3 +30,4 @@ Atualizado em 22/10/2026.
 
 7. Manter a ponte do painel Grupo limitada a comandos explícitos do Android e adicionar comandos somente com implementação nativa correspondente.
 
+
