@@ -1205,7 +1205,7 @@
   el("change-phone")?.addEventListener("click", () => { state.passwordRecovery = false; storage.removeItem("urtador-password-recovery"); showAuth("password"); el("otp").value = ""; el("login-password").value = ""; say(el("auth-message"), ""); });
   document.querySelectorAll("[data-logout]").forEach((button) => button.addEventListener("click", async () => {
     try { await api("logout"); } catch { /* The local session is still discarded if the network is unavailable. */ }
-    state.token = ""; state.passwordSetupRequired = false; state.passwordRecovery = false; storage.removeItem("urtador-token"); storage.removeItem("urtador-phone"); storage.removeItem("urtador-password-setup"); storage.removeItem("urtador-password-recovery");
+    state.token = ""; state.passwordSetupRequired = false; state.passwordRecovery = false; storage.removeItem("urtador-token"); storage.removeItem("urtador-phone"); storage.removeItem("urtador-password-setup"); storage.removeItem("urtador-password-recovery"); sessionStorage.removeItem("rapidao-profile-display");
     state.user = null; state.activeDashboardPage = "";
     setLoggedIn(false); showAuth("password"); el("login-password").value = ""; say(el("auth-message"), "Você saiu da sua conta.");
   }));
@@ -1213,6 +1213,19 @@
   document.querySelectorAll("[data-dashboard-page]").forEach((button) => button.addEventListener("click", () => {
     showDashboardPage(button.dataset.dashboardPage);
   }));
+  el("rapidao-nav-item")?.addEventListener("click", async () => {
+    const digits = String(state.user?.phone || "").replace(/\D/g, "");
+    if (digits.length < 6 || !state.data?.expiresAt) {
+      window.alert("Atualize o painel antes de abrir o Rapidao.");
+      return;
+    }
+    sessionStorage.setItem("rapidao-profile-display", JSON.stringify({
+      phoneMasked: `+${digits.slice(0, Math.min(4, digits.length - 4))} •••• ${digits.slice(-4)}`,
+      accountNumber: Number(state.user?.accountNumber || 1),
+      expiresAt: state.data.expiresAt
+    }));
+    window.location.assign("rapidao/perfil/");
+  });
 
   el("shortener-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
