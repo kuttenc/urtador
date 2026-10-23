@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Leilão Rapidão</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">RASCUNHO LOCAL</p>
+        <h1>Leilão Rapidão</h1>
+        <p class="intro">Cadastre seus próprios itens e exporte o anúncio para revisão.</p>
+      </header>
+      <form id="listing-form">
+        <label>Nome do item<input id="name" maxlength="120" required placeholder="Ex.: iPhone 12 64 GB"></label>
+        <div class="grid">
+          <label>Categoria<select id="category" required><option value="">Escolha</option><option>Celulares e Smartphones</option><option>Informática</option><option>Eletrônicos</option><option>Eletrodomésticos</option><option>Ferramentas</option><option>Móveis</option><option>Veículos e peças</option><option>Moda e acessórios</option><option>Outros</option></select></label>
+          <label>Lote<input id="lot" maxlength="60" required placeholder="Ex.: LOTE-001"></label>
+        </div>
+        <label id="custom-category-wrap" hidden>Qual categoria?<input id="custom-category" maxlength="60" placeholder="Descreva a categoria"></label>
+        <label>Descrição<textarea id="description" maxlength="2000" rows="4" placeholder="Estado, acessórios, avarias e demais informações do item."></textarea></label>
+        <label>Lance mínimo (R$)<input id="minimum-bid" inputmode="decimal" required placeholder="234,00"></label>
+        <label>Fotos do item <span>até 3, JPG, PNG ou WebP; 1,5 MB cada</span><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple></label>
+        <div id="photo-preview" class="photo-preview" aria-live="polite"></div>
+        <p class="notice">As fotos e rascunhos ficam somente neste navegador até você exportar ou apagar.</p>
+        <button type="submit" class="primary">Salvar rascunho</button>
+        <p id="form-status" class="status" aria-live="polite"></p>
+      </form>
+      <section aria-labelledby="saved-title">
+        <div class="section-heading"><h2 id="saved-title">Rascunhos salvos</h2><button id="clear-all" class="text-button" type="button">Apagar todos</button></div>
+        <div id="saved-list" class="saved-list"></div>
+      </section>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

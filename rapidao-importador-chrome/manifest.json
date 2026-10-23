@@ -1,0 +1,11 @@
+{
+  "manifest_version": 3,
+  "name": "Leilão Rapidão — Importador manual",
+  "version": "1.0.0",
+  "description": "Cria rascunhos locais de anúncios próprios com fotos e descrição.",
+  "action": {
+    "default_title": "Leilão Rapidão — Importador manual",
+    "default_popup": "popup.html"
+  },
+  "permissions": ["storage", "downloads"]
+}
