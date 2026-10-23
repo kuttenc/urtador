@@ -3,6 +3,7 @@
   const byId = (id) => document.getElementById(id);
   const ref = new URLSearchParams(location.search).get("s") || "";
   let period = "day";
+  const nativePanel = Boolean(window.PT260Grupo && typeof window.PT260Grupo.available === "function" && window.PT260Grupo.available());
 
   const copy = {
     unavailable: "Abra este painel pela aba Grupo do aplicativo.",
@@ -45,6 +46,11 @@
     events.forEach((event) => {
       const item = document.createElement("article");
       item.className = "report-item";
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "report-check";
+      check.setAttribute("aria-label", "Marcar para impressão");
+      check.addEventListener("change", () => item.classList.toggle("selected", check.checked));
       const title = document.createElement("strong");
       title.textContent = event.item || event.ean || "Item sem descrição";
       const route = document.createElement("span");
@@ -53,7 +59,7 @@
       const sent = document.createElement("span");
       const date = event.sent_at || event.captured_at;
       sent.textContent = date ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(date)) : "Envio registrado";
-      item.append(title, route, sent);
+      item.append(check, title, route, sent);
       list.append(item);
     });
   }
@@ -90,6 +96,18 @@
       load();
     });
   });
+  if (nativePanel) {
+    byId("cloud-actions").hidden = false;
+    byId("open-collection").addEventListener("click", () => window.PT260Grupo.openCollection());
+    byId("print-selection").addEventListener("click", () => {
+      if (!document.querySelector(".report-check:checked")) {
+        byId("notice").textContent = "Marque ao menos um item para imprimir.";
+        return;
+      }
+      byId("notice").textContent = "";
+      window.PT260Grupo.printSelection();
+    });
+  }
   byId("refresh").addEventListener("click", load);
   load();
 })();

@@ -20,6 +20,7 @@ Atualizado em 22/10/2026.
 - O painel apresenta relatórios da própria sessão com filtros **Hoje**, **7 dias** e **Todas**. A lista mostra item, origem, destino, quantidade e horário, sem devolver telefone, IP ou dados do aparelho ao GitHub Pages. A retenção operacional dos eventos fica no Supabase.
 - `deploy-pages.yml` precisa manter a cópia `cp -R validade-pt260 _site/validade-pt260`; sem essa linha a pasta existe no Git, mas não chega ao GitHub Pages.
 - Alterações nesses três arquivos podem ser publicadas via `main` sem gerar APK/AAB. A integração nativa, a câmera e a sessão inicial pertencem ao projeto `ValidadePRODark`.
+- No app 1.25.31 ou superior, a página integrada pode solicitar somente duas ações nativas por ponte: abrir a coleta pela câmera e imprimir os eventos selecionados pelo seletor de impressão do Android. A página não recebe permissões, dados pessoais ou credenciais.
 
 ## Acesso
 
@@ -47,5 +48,6 @@ Atualizado em 22/10/2026.
 2. Testar criação, redirecionamento e painel com conta de teste.
 3. Conferir a página publicada sem cache, em navegador móvel.
 4. Atualizar este arquivo com a versão, decisão e pendência que restar.
+
 
 
