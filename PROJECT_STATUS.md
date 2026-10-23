@@ -16,7 +16,7 @@ Atualizado em 23/10/2026.
 - **Separação de Supabase:** o Urtador existente permanece no projeto `ggufcvrwctieacvbbwim`, como definido em `assets/config.js` e no workflow de backend. O Leilão Rapidão pode usar o projeto isolado `suipuquznkksgrkchqrv` para tabelas e funções próprias, sem alterar contas, links, OTP ou dados financeiros do Urtador. A conta/e-mail administrativa do projeto antigo não está registrada no repositório; consulte o seletor de organização/projetos no painel Supabase para identificá-la.
 - Em 19/10/2026, a arte lateral do acesso foi removida e o painel recebeu a identidade Neon: superfícies pretas, sinalização vermelha e contornos azuis luminosos.
 - O caminho público `validade-pt260/` é o painel integrado do Validade PT260. Ele é aberto pelo app com uma referência opaca de sessão e não recebe telefone, IP, credenciais ou identificadores de aparelho.
-- O painel inclui `validade-pt260/pedir/`, aberto com a mesma referência opaca de sessão. A página organiza listas de pedidos em vários itens, permite revisão e envia um pedido consolidado somente após validação server-side do acesso administrativo. O navegador não recebe telefone, token de mensageria ou identificador do grupo.
+- O painel inclui `validade-pt260/pedir/`, aberto com a mesma referência opaca de sessão. A página organiza listas de pedidos em vários itens, exige os quatro últimos dígitos do telefone vinculado à sessão e o destino P1–P7, permite revisão e envia um pedido consolidado somente após validação server-side do acesso administrativo. O lote privado registra também o IP recebido no envio. O navegador não recebe telefone, token de mensageria ou identificador do grupo.
 
 ## Painel público do Validade PT260
 

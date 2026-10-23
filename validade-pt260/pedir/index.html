@@ -17,8 +17,10 @@
         <article class="bubble guide"><strong>Formato sugerido</strong><p>Pedido do Bar - P5<br>3 caixas de água sem gás<br>2 fardos de refrigerante<br>1 pacote de polpa de maracujá</p></article>
       </section>
       <section class="panel">
-        <label for="destination">Destino do pedido</label>
-        <input id="destination" maxlength="80" placeholder="Ex.: Bar P5">
+        <label for="phone-last4">Confirme os 4 últimos dígitos do seu telefone</label>
+        <input id="phone-last4" inputmode="numeric" autocomplete="one-time-code" maxlength="4" placeholder="Ex.: 6164">
+        <label for="destination">Para qual setor é este pedido?</label>
+        <select id="destination" required><option value="">Selecione P1–P7</option><option>P1</option><option>P2</option><option>P3</option><option>P4</option><option>P5</option><option>P6</option><option>P7</option></select>
         <label for="source">Cole a lista de pedidos</label>
         <textarea id="source" rows="12" maxlength="12000" placeholder="Cole aqui a lista completa. Não precisa apagar títulos ou categorias."></textarea>
         <div class="actions"><button id="parse" type="button">REVISAR LISTA</button><button id="clear" type="button" class="secondary">LIMPAR</button></div>
