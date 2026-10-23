@@ -16,6 +16,7 @@ Atualizado em 22/10/2026.
 4. Documentar cada mudança de regra de repasse com data de vigência.
 5. Manter o painel público do Validade PT260 limitado a informações não sensíveis e a referências de sessão com expiração.
 6. Ao ampliar o painel do Validade PT260, consumir somente dados retornados pelo endpoint de sessão e manter qualquer dado operacional identificado no Supabase privado.
+7. Publicar a revisão de validity-group-web-session que devolve o relatório filtrado da sessão depois de regularizar a permissão de deploy da conta Supabase.
 
 ## Critérios para concluir um item
 
@@ -23,4 +24,6 @@ Atualizado em 22/10/2026.
 - Interface do GitHub Pages atualizada.
 - Fluxo testado em navegador móvel.
 - Estado e versão atualizados em `PROJECT_STATUS.md`.
+
+
 

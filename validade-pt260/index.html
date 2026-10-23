@@ -21,10 +21,17 @@
         <article><span id="card-two-label">Idioma</span><strong id="language-value">—</strong></article>
       </section>
       <section class="panel">
-        <p class="kicker" id="panel-kicker">COLETA</p>
-        <h2 id="panel-title">Próximo passo</h2>
-        <p id="panel-copy">No aplicativo, informe origem, destino e quantidade. Tire a foto para enviar ao grupo operacional.</p>
-        <button id="refresh" type="button">ATUALIZAR PAINEL</button>
+        <p class="kicker" id="panel-kicker">RELATÓRIOS DA SESSÃO</p>
+        <h2 id="panel-title">Coletas enviadas</h2>
+        <p id="panel-copy">Escolha o período para consultar somente as fotos enviadas por esta sessão.</p>
+        <div class="periods" role="group" aria-label="Período do relatório">
+          <button class="period active" data-period="day" type="button">HOJE</button>
+          <button class="period" data-period="week" type="button">7 DIAS</button>
+          <button class="period" data-period="all" type="button">TODAS</button>
+        </div>
+        <p id="report-summary" class="report-summary">Carregando coletas…</p>
+        <div id="report-list" class="report-list" aria-live="polite"></div>
+        <button id="refresh" type="button">ATUALIZAR RELATÓRIO</button>
       </section>
       <p id="notice" class="notice" aria-live="polite"></p>
     </main>

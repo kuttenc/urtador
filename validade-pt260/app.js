@@ -1,41 +1,92 @@
 (() => {
   const endpoint = "https://suipuquznkksgrkchqrv.supabase.co/functions/v1/validity-group-web-session";
-  const text = {
-    "pt-BR": {
-      state: "CONECTADO", title: "Sua sessão<br>de coleta.", lead: "Este painel foi aberto pelo aplicativo e está vinculado à sessão atual do dispositivo.", session: "Sessão", sessionValue: "Vinculada", language: "Idioma", panelTitle: "Próximo passo", panelCopy: "No aplicativo, informe origem, destino e quantidade. Tire a foto para enviar ao grupo operacional.", refresh: "ATUALIZAR PAINEL", unavailable: "Abra este painel pela aba Grupo do aplicativo.", error: "Não foi possível confirmar a sessão agora."
-    },
-    en: {
-      state: "CONNECTED", title: "Your collection<br>session.", lead: "This panel was opened by the app and is linked to the current device session.", session: "Session", sessionValue: "Linked", language: "Language", panelTitle: "Next step", panelCopy: "In the app, enter origin, destination and quantity. Take a photo to send it to the operational group.", refresh: "REFRESH PANEL", unavailable: "Open this panel from the app Group tab.", error: "The session could not be confirmed right now."
-    }
-  };
   const byId = (id) => document.getElementById(id);
   const ref = new URLSearchParams(location.search).get("s") || "";
-  function apply(language) {
-    const copy = text[language] || text.en;
-    document.documentElement.lang = language;
-    byId("state").textContent = copy.state;
-    byId("title").innerHTML = copy.title;
-    byId("lead").textContent = copy.lead;
-    byId("card-one-label").textContent = copy.session;
-    byId("session-value").textContent = copy.sessionValue;
-    byId("card-two-label").textContent = copy.language;
-    byId("language-value").textContent = language === "pt-BR" ? "Português" : "English";
-    byId("panel-title").textContent = copy.panelTitle;
-    byId("panel-copy").textContent = copy.panelCopy;
-    byId("refresh").textContent = copy.refresh;
+  let period = "day";
+
+  const copy = {
+    unavailable: "Abra este painel pela aba Grupo do aplicativo.",
+    error: "Não foi possível confirmar a sessão agora.",
+    loading: "Carregando coletas…",
+    empty: "Nenhuma coleta neste período.",
+    count: (value) => value === 1 ? "1 coleta enviada" : `${value} coletas enviadas`
+  };
+
+  function applyLanguage(language) {
+    const portuguese = language === "pt-BR";
+    document.documentElement.lang = portuguese ? "pt-BR" : "en";
+    byId("state").textContent = portuguese ? "CONECTADO" : "CONNECTED";
+    byId("title").innerHTML = portuguese ? "Sua sessão<br>de coleta." : "Your collection<br>session.";
+    byId("lead").textContent = portuguese
+      ? "Este painel mostra somente as fotos enviadas por esta sessão do aplicativo."
+      : "This panel shows only photos sent by this app session.";
+    byId("card-one-label").textContent = portuguese ? "Sessão" : "Session";
+    byId("session-value").textContent = portuguese ? "Vinculada" : "Linked";
+    byId("card-two-label").textContent = portuguese ? "Idioma" : "Language";
+    byId("language-value").textContent = portuguese ? "Português" : "English";
+    byId("panel-title").textContent = portuguese ? "Coletas enviadas" : "Sent collections";
+    byId("panel-copy").textContent = portuguese
+      ? "Escolha o período para consultar as fotos desta sessão."
+      : "Choose a period to view this session's photos.";
+    byId("refresh").textContent = portuguese ? "ATUALIZAR RELATÓRIO" : "REFRESH REPORT";
   }
+
+  function renderEvents(events) {
+    const list = byId("report-list");
+    list.replaceChildren();
+    byId("report-summary").textContent = copy.count(events.length);
+    if (!events.length) {
+      const empty = document.createElement("div");
+      empty.className = "report-empty";
+      empty.textContent = copy.empty;
+      list.append(empty);
+      return;
+    }
+    events.forEach((event) => {
+      const item = document.createElement("article");
+      item.className = "report-item";
+      const title = document.createElement("strong");
+      title.textContent = event.item || event.ean || "Item sem descrição";
+      const route = document.createElement("span");
+      const quantity = event.quantity ? `${event.quantity}${event.unit ? ` ${event.unit}` : ""}` : "Quantidade não informada";
+      route.textContent = `${event.origin || "Origem não informada"} → ${event.destination || "Destino não informado"} · ${quantity}`;
+      const sent = document.createElement("span");
+      const date = event.sent_at || event.captured_at;
+      sent.textContent = date ? new Intl.DateTimeFormat("pt-BR", { dateStyle: "short", timeStyle: "short" }).format(new Date(date)) : "Envio registrado";
+      item.append(title, route, sent);
+      list.append(item);
+    });
+  }
+
   async function load() {
-    if (!/^[0-9a-f-]{36}$/i.test(ref)) { byId("notice").textContent = text["pt-BR"].unavailable; return; }
+    if (!/^[0-9a-f-]{36}$/i.test(ref)) {
+      byId("notice").textContent = copy.unavailable;
+      byId("report-summary").textContent = "";
+      return;
+    }
     byId("notice").textContent = "";
+    byId("report-summary").textContent = copy.loading;
+    byId("report-list").replaceChildren();
     try {
-      const response = await fetch(`${endpoint}?s=${encodeURIComponent(ref)}`);
+      const response = await fetch(`${endpoint}?s=${encodeURIComponent(ref)}&period=${encodeURIComponent(period)}`);
       const data = await response.json();
       if (!response.ok || !data.ok) throw new Error("session");
-      apply(data.language === "pt-BR" ? "pt-BR" : "en");
+      applyLanguage(data.language === "pt-BR" ? "pt-BR" : "en");
+      renderEvents(Array.isArray(data.events) ? data.events : []);
     } catch (_) {
-      byId("notice").textContent = text["pt-BR"].error;
+      byId("notice").textContent = copy.error;
+      byId("report-summary").textContent = "";
     }
   }
+
+  document.querySelectorAll(".period").forEach((button) => {
+    button.addEventListener("click", () => {
+      period = button.dataset.period || "day";
+      document.querySelectorAll(".period").forEach((item) => item.classList.toggle("active", item === button));
+      load();
+    });
+  });
   byId("refresh").addEventListener("click", load);
   load();
 })();
+

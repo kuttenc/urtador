@@ -17,6 +17,7 @@ Atualizado em 22/10/2026.
 - URL publicada: `https://kuttenc.github.io/urtador/validade-pt260/`.
 - A página só reconhece uma sessão quando recebe `?s=<referência UUID>` emitida pelo app. Sem essa referência, mostra a orientação para abrir pelo aplicativo.
 - A página chama `validity-group-web-session` com `GET`; a resposta contém apenas idioma e expiração. Nunca incluir telefone, IP, dados de dispositivo, chaves do Supabase, URLs internas ou segredos no JavaScript público.
+- O painel apresenta relatórios da própria sessão com filtros **Hoje**, **7 dias** e **Todas**. A lista mostra item, origem, destino, quantidade e horário, sem devolver telefone, IP ou dados do aparelho ao GitHub Pages. A retenção operacional dos eventos fica no Supabase.
 - `deploy-pages.yml` precisa manter a cópia `cp -R validade-pt260 _site/validade-pt260`; sem essa linha a pasta existe no Git, mas não chega ao GitHub Pages.
 - Alterações nesses três arquivos podem ser publicadas via `main` sem gerar APK/AAB. A integração nativa, a câmera e a sessão inicial pertencem ao projeto `ValidadePRODark`.
 
@@ -46,4 +47,5 @@ Atualizado em 22/10/2026.
 2. Testar criação, redirecionamento e painel com conta de teste.
 3. Conferir a página publicada sem cache, em navegador móvel.
 4. Atualizar este arquivo com a versão, decisão e pendência que restar.
+
 
