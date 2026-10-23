@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#080a0f">
+    <meta name="description" content="Cadastro manual de anúncios próprios do Leilão Rapidão.">
+    <meta name="robots" content="noindex,nofollow">
+    <title>Cadastro de item — Leilão Rapidão</title>
+    <link rel="stylesheet" href="cadastro.css">
+  </head>
+  <body>
+    <header class="topbar"><a class="brand" href="../" aria-label="Leilão Rapidão, início"><b>R</b><span>leilão rapidão</span></a><a href="../">Ver anúncios</a></header>
+    <main>
+      <section class="intro"><p class="eyebrow">CADASTRO MANUAL</p><h1>Monte o rascunho do item.</h1><p>Arraste as fotos que você possui, informe o lote e exporte um arquivo de revisão. Nenhuma foto é enviada ou publicada por esta página.</p></section>
+      <form id="listing-form" novalidate>
+        <section class="panel photo-panel"><div class="section-title"><div><p class="eyebrow">01 · FOTOS</p><h2>Solte as fotos aqui</h2></div><span id="photo-count">0 de 5</span></div><input id="photos" type="file" accept="image/jpeg,image/png,image/webp" multiple hidden><button id="drop-zone" class="drop-zone" type="button"><strong>Arraste fotos do item para esta área</strong><span>ou clique para escolher no computador</span><small>JPG, PNG ou WebP · até 5 imagens · 2 MB por foto</small></button><div id="photo-preview" class="photo-preview" aria-live="polite"></div></section>
+        <section class="panel fields-panel"><div class="section-title"><div><p class="eyebrow">02 · DADOS DO ITEM</p><h2>Descrição do anúncio</h2></div></div><div class="form-grid"><label class="wide">Nome do item<input id="name" maxlength="120" autocomplete="off" placeholder="Ex.: iPhone 12 64 GB" required></label><label>Categoria<select id="category" required><option value="">Escolha uma categoria</option><option>Celulares e Smartphones</option><option>Informática</option><option>Eletrônicos</option><option>Eletrodomésticos</option><option>Ferramentas</option><option>Móveis</option><option>Veículos e peças</option><option>Moda e acessórios</option><option>Outros</option></select></label><label>Lote<input id="lot" maxlength="60" autocomplete="off" placeholder="Ex.: LOTE-001" required></label><label id="custom-category-wrap" class="wide" hidden>Outra categoria<input id="custom-category" maxlength="60" autocomplete="off" placeholder="Informe a categoria"></label><label class="wide">Descrição<textarea id="description" maxlength="2000" rows="6" placeholder="Informe estado do item, acessórios, avarias e o que acompanha."></textarea></label><label>Lance mínimo (R$)<input id="minimum-bid" inputmode="decimal" autocomplete="off" placeholder="234,00" required></label><label>Condição<select id="condition"><option>Usado</option><option>Novo</option><option>Usado com avarias descritas</option><option>Outro</option></select></label></div></section>
+        <section class="panel export-panel"><div><p class="eyebrow">03 · REVISÃO</p><h2>Exporte antes de publicar</h2><p>O arquivo JSON reúne os dados e as fotos selecionadas. Ele serve como rascunho; não cria anúncio, não recebe lance e não envia conteúdo a terceiros.</p></div><div class="actions"><button id="clear" type="button" class="secondary">Limpar</button><button type="submit" class="primary">Baixar rascunho JSON</button></div><p id="status" class="status" role="status" aria-live="polite"></p></section>
+      </form>
+    </main>
+    <script src="cadastro.js"></script>
+  </body>
+</html>
