@@ -38,3 +38,4 @@ Atualizado em 23/10/2026.
 10. Incluir no perfil Rapidao histórico de anúncios e lances somente depois que as tabelas, regras de autorização, retenção e auditoria do módulo de lances forem publicadas.
 
 11. Antes de usar comparações de mercado ou alegações de liderança no Leilão Rapidão, reunir evidência objetiva e manter a data e a fonte da comparação.
+12. Criar o catálogo e lances do Leilão Rapidão no projeto Supabase isolado `suipuquznkksgrkchqrv`, com autenticação própria ou uma ponte autorizada pelo backend do Urtador. Não mover o Urtador existente de `ggufcvrwctieacvbbwim` sem migração planejada de usuários, sessões, links e regras financeiras.
