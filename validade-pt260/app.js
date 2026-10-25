@@ -4,6 +4,7 @@
   const ref = new URLSearchParams(location.search).get("s") || "";
   let period = "day";
   const nativePanel = Boolean(window.PT260Grupo && typeof window.PT260Grupo.available === "function" && window.PT260Grupo.available());
+  const nativeLogistics = Boolean(nativePanel && typeof window.PT260Grupo.openLogistics === "function");
 
   const copy = {
     unavailable: "Abra este painel pela aba Grupo do aplicativo.",
@@ -100,6 +101,13 @@
     byId("cloud-actions").hidden = false;
     byId("open-orders").href = `pedir/?s=${encodeURIComponent(ref)}`;
     byId("open-collection").addEventListener("click", () => window.PT260Grupo.openCollection());
+    if (nativeLogistics) {
+      byId("open-logistics").hidden = false;
+      byId("open-logistics").addEventListener("click", (event) => {
+        event.preventDefault();
+        window.PT260Grupo.openLogistics();
+      });
+    }
     byId("print-selection").addEventListener("click", () => {
       if (!document.querySelector(".report-check:checked")) {
         byId("notice").textContent = "Marque ao menos um item para imprimir.";
@@ -112,5 +120,3 @@
   byId("refresh").addEventListener("click", load);
   load();
 })();
-
-

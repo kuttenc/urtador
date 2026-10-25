@@ -28,7 +28,9 @@ button { width: 100%; margin-top: 18px; padding: 14px; border: 0; border-radius:
 .report-item.selected { border-color: #00e6aa; box-shadow: 0 0 0 1px rgba(0, 230, 170, .18); }
 .report-check { width: 18px; height: 18px; float: right; accent-color: #00e6aa; }
 .cloud-actions { display: grid; gap: 7px; margin-top: 12px; }
-.secondary-action { margin: 0; background: #102923; color: #9ee9d5; border: 1px solid #315b50; }
+.cloud-actions[hidden] { display: none; }
+.secondary-action { display: block; width: 100%; margin: 0; padding: 14px; border: 1px solid #315b50; border-radius: 8px; background: #102923; color: #9ee9d5; font-weight: 900; letter-spacing: .05em; text-align: center; text-decoration: none; }
+.secondary-action[hidden] { display: none; }
 .report-empty { padding: 14px; border: 1px dashed #315b50; border-radius: 8px; color: #8ea8a2; font-size: 13px; text-align: center; }
 .notice { min-height: 20px; color: #ff8b8b; font-size: 13px; text-align: center; }
 @media (max-width: 360px) { .shell { padding: 14px; } .hero { padding-top: 22px; } }
