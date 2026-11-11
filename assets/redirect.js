@@ -49,6 +49,17 @@
     return;
   }
 
+  // QR colado na mesa do O Peixeiro: a etiqueta imprime
+  // /urtador/opeixeiro/P<ponto>mesa<numero> (ou /urtador/opeixeiro/mesa<numero ou base64>). Não é
+  // link curto cadastrado no Urtador — é o cardápio — e nenhum destino fixo de link curto leva o
+  // ponto e a mesa junto. Encaminha direto para a página, antes da tela "Abrir destino", com o
+  // segmento inteiro em ?m=; quem decodifica ponto e mesa é o app.js da página.
+  const mesaDoOpeixeiro = /^opeixeiro\/((?:p\d{1,2})?mesa[a-z0-9+/=-]*)$/i.exec(slug);
+  if (mesaDoOpeixeiro) {
+    window.location.replace(`/opeixeiro/?m=${encodeURIComponent(mesaDoOpeixeiro[1])}`);
+    return;
+  }
+
   function loadTurnstile(siteKey) {
     return new Promise((resolve, reject) => {
       if (window.turnstile) { resolve(window.turnstile); return; }
