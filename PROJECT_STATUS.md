@@ -45,7 +45,7 @@ Atualizado em 23/10/2026.
 ## Publicidade e links
 
 - A página curta pode exibir um banner Adsterra identificado; o anúncio não bloqueia o redirecionamento, não exige interação e não usa temporizador.
-- O carregamento inicial de cada rota curta abre uma janela fixa de 15 minutos por hash de IP e link. Depois disso a rota volta à página principal, que restaura o painel quando existir sessão válida.
+- **Desde 16/11/2026 a rota curta não expira mais** (decisão do dono: "não quero que o link expire nunca"). O backend registra `first_accessed_at`/`last_accessed_at` por hash de IP e link em `kutt_link_access_windows`, mas nenhuma rota devolve `accessExpired` — inclusive links que já tinham vencido na regra antiga de 15 minutos, que continuam abrindo. Para voltar atrás, vale o commit anterior da função `kutt-short-links`.
 - Quando as chaves `TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` estiverem configuradas no Supabase, cada rota curta exibe o Cloudflare Turnstile antes de liberar o destino. A validação acontece no backend.
 - Todo destino cadastrado deve ser validado no servidor antes de ser publicado como link curto.
 

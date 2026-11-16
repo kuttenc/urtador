@@ -998,29 +998,23 @@ async function linkAccessWindow(linkId: string, ip: string) {
   const visitorHash = ip === "unknown" ? "" : await hash(ip);
   if (!visitorHash) return { accessExpired: false, visitorHash, expiresAt: null };
   const now = new Date();
+  // Decisão do dono em 16/11/2026: link curto não expira mais. A linha continua marcando o primeiro
+  // e o último acesso de cada visitante, mas o prazo deixou de ser lido — nenhum clique devolve
+  // accessExpired, nem os links que já tinham vencido na regra antiga de 15 minutos.
   const { error: insertError } = await supabase.from("kutt_link_access_windows").insert({
     link_id: linkId,
     visitor_ip_hash: visitorHash,
     first_accessed_at: now.toISOString(),
     last_accessed_at: now.toISOString(),
-    expires_at: new Date(now.getTime() + 15 * 60 * 1000).toISOString()
+    expires_at: new Date(now.getTime() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString()
   });
   if (insertError && insertError.code !== "23505") throw insertError;
-  const { data: window, error: windowError } = await supabase.from("kutt_link_access_windows")
-    .select("expires_at")
+  const { error: touchError } = await supabase.from("kutt_link_access_windows")
+    .update({ last_accessed_at: now.toISOString() })
     .eq("link_id", linkId)
-    .eq("visitor_ip_hash", visitorHash)
-    .single();
-  if (windowError) throw windowError;
-  const accessExpired = new Date(window.expires_at).getTime() <= now.getTime();
-  if (!accessExpired) {
-    const { error: touchError } = await supabase.from("kutt_link_access_windows")
-      .update({ last_accessed_at: now.toISOString() })
-      .eq("link_id", linkId)
-      .eq("visitor_ip_hash", visitorHash);
-    if (touchError) throw touchError;
-  }
-  return { accessExpired, visitorHash, expiresAt: window.expires_at };
+    .eq("visitor_ip_hash", visitorHash);
+  if (touchError) throw touchError;
+  return { accessExpired: false, visitorHash, expiresAt: null };
 }
 
 async function startLinkAccessWindow(request: Request, payload: Payload) {
