@@ -34,4 +34,4 @@ jobs:
           supabase db push --remote "$SUPABASE_PROJECT_ID" --yes
 
       - name: Deploy short-link function
-        run: supabase functions deploy kutt-short-links --remote "$SUPABASE_PROJECT_ID"
+        run: supabase functions deploy kutt-short-links --remote="$SUPABASE_PROJECT_ID"
